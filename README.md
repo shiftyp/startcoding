@@ -18,3 +18,6 @@ To create a WoofJS like environment, supporting multiple languages as well as fr
 ## **Documentation**
 
 See [0001-architectural-decision-records.md](./docs/decisions/0001-architectural-decision-records.md)
+
+MIT Licensed
+Copyright 2023 Ryan (Lynch) Kahn
