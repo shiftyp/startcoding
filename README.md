@@ -1,6 +1,6 @@
 # StartCoding.dev
 
-A simplified =[scratch](https://scratch.mit.edu) / [woofjs](https://woofjs/.com) like environment for learning to code. Currently planned for JavaScript and Python
+A simplified [scratch](https://scratch.mit.edu) / [woofjs](https://woofjs/.com) like environment for learning to code. Currently planned for JavaScript and Python
 
 ## **Mission**
 
