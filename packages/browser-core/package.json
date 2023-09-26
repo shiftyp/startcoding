@@ -1,0 +1,20 @@
+{
+  "name": "@startcoding/browser-core",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "private": "true",
+  "devDependencies": {
+    "@startcoding/ts-core": "*",
+    "typescript": "5.2.2",
+    "esbuild": "0.19.3"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}

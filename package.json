@@ -1,0 +1,13 @@
+{
+  "name": "startcoding",
+  "version": "1.0.0",
+  "repository": "git@github.com:shiftyp/startcoding.git",
+  "author": "Ryan Lynch <lynch.r.j@gmail.com>",
+  "license": "MIT",
+  "workspaces": [
+    "./packages/ts-core",
+    "./packages/browser-core",
+    "./packages/ui"
+  ],
+  "private": true
+}
