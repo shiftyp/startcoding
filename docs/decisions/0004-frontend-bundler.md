@@ -25,3 +25,7 @@ ESBuild
 * Good, supports chosen tech
 * Bad, slightly unknown to team
 * Bad, possible later limitations with WebAssembly
+
+### Additional Information
+
+* https://esbuild.github.io/
