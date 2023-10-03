@@ -8,3 +8,5 @@ ADRs in order of application. New ADRs should follow the [template](./template.m
 1. [Frontend Bundle](./frontend-bundler.md)
 1. [Developer Experience](./developer-experience.md)
 1. [Architectural Decision Record Index](./architectural-decision-record-index.md)
+1. [Git Server Architecture](./git-server-architecture.md)
+1. [Minio Object Storage](./minio-object-storage.md)

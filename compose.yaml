@@ -1,9 +1,39 @@
 version: "3"
 
 services:
+
   client:
     image: nginx
     ports:
       - 8000:80
     volumes:
       - ./packages/ui/public:/usr/share/nginx/html
+
+  data:
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      - MINIO_ROOT_USER=ROOTUSER
+      - MINIO_ROOT_PASSWORD=CHANGEME123
+    volumes:
+      - "./data:/data"
+    image: quay.io/minio/minio
+    command: server /
+
+  code:
+    image: node
+    volumes:
+      - "./:/app"
+    environment:
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=ROOTUSER
+      - MINIO_SECRET_KEY=CHANGEME123
+      - MINIO_REPO_BUCKET=repos
+      - REPO_STORAGE_DIRECTORY=/app/data/repos
+    command:
+      [
+        "sh",
+        "-c",
+        "cd /app && yarn workspace @startcoding/code run start"
+      ]

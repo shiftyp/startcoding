@@ -7,7 +7,9 @@
   "workspaces": [
     "./packages/ts-core",
     "./packages/browser-core",
-    "./packages/ui"
+    "./packages/project",
+    "./packages/ui",
+    "./services/code"
   ],
   "private": true
 }
