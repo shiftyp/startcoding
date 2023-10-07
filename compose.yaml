@@ -9,7 +9,7 @@ services:
     volumes:
       - ./packages/ui/public:/usr/share/nginx/html
 
-  data:
+  minio:
     ports:
       - "9000:9000"
       - "9090:9090"
@@ -19,7 +19,17 @@ services:
     volumes:
       - "./data:/data"
     image: quay.io/minio/minio
-    command: server /
+    command: server /data
+
+  couchdb:
+    volumes:
+      - ./data/couchdb:/opt/couchdb/data
+    environment:
+      - COUCHDB_USER=ROOTUSER
+      - COUCHDB_PASSWORD=CHANGEME123
+    ports:
+      - "5984:5984"
+    image: couchdb
 
   code:
     image: node
