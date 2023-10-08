@@ -9,6 +9,7 @@
     "./packages/browser-core",
     "./packages/project",
     "./packages/ui",
+    "./packages/auth",
     "./services/code"
   ],
   "private": true
