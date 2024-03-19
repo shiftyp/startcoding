@@ -1,11 +1,24 @@
 import * as git from "isomorphic-git";
-import * as Minio from "minio";
+import {
+  S3Client,
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { v1 as UUID } from "uuid";
-import { diff_match_patch } from "diff-match-patch";
+import { IncomingMessage, OutgoingMessage } from 'http'
+// @ts-ignore
+import backend from "git-http-backend";
 import zlib from "zlib";
 import tar from "tar";
+import { spawn } from "child_process";
+// @ts-ignore
 import fs from "fs/promises";
+import { existsSync } from "fs";
 import path from "path";
+// @ts-ignore
+import streamToBlob from "stream-to-blob";
+import chokidar from "chokidar"
 
 const {
   MINIO_URL,
@@ -26,11 +39,14 @@ if (!MINIO_SECRET_KEY) {
 }
 
 const connectMinio = () => {
-  return new Minio.Client({
-    endPoint: MINIO_URL,
-    port: 9000,
-    accessKey: MINIO_ACCESS_KEY,
-    secretKey: MINIO_SECRET_KEY,
+  return new S3Client({
+    endpoint: `http://${MINIO_URL}:9000`,
+    credentials: {
+      accessKeyId: MINIO_ACCESS_KEY,
+      secretAccessKey: MINIO_SECRET_KEY,
+    },
+    forcePathStyle: true,
+    region: "local",
   });
 };
 
@@ -44,100 +60,152 @@ if (!REPO_STORAGE_DIRECTORY) {
 }
 
 const uploadRepo = async (id: string, uuid: string) => {
-  await client.putObject(
-    MINIO_REPO_BUCKET,
-    `${id}.tgz`,
-    tar.c({ gzip: true }, [path.join(REPO_STORAGE_DIRECTORY, uuid)])
+  const root = path.join(REPO_STORAGE_DIRECTORY, uuid);
+  const blob: Blob = await streamToBlob(
+    tar.c({ gzip: true, z: true, cwd: root }, ["./"])
   );
+  const command = new PutObjectCommand({
+    Bucket: MINIO_REPO_BUCKET,
+    Key: `${id}.tgz`,
+    Body: new Uint8Array(await blob.arrayBuffer()),
+  });
+
+  client.send(command);
 };
 
 const syncRepository = async (id: string) => {
   const uuid = UUID();
   const root = path.join(REPO_STORAGE_DIRECTORY, uuid);
 
-  if (!(await client.bucketExists(MINIO_REPO_BUCKET))) {
-    await client.makeBucket(MINIO_REPO_BUCKET);
+  try {
+    await client.send(
+      new CreateBucketCommand({
+        Bucket: MINIO_REPO_BUCKET,
+      })
+    );
+  } catch (e) {
+    console.error(e);
   }
 
-  await fs.mkdir(root);
+  if (!existsSync(root)) {
+    await fs.mkdir(root);
+  }
 
   try {
-    await new Promise<void>(async (resolve, reject) => {
-      const operations: Promise<void>[] = [];
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: MINIO_REPO_BUCKET,
+        Key: `${id}.tgz`,
+      })
+    );
 
-      (await client.getObject(MINIO_REPO_BUCKET, `${id}.tar.gz`))
-        .pipe(zlib.createGunzip())
-        .pipe(tar.t())
-        .on("entry", (entry: tar.ReadEntry) =>
-          operations.push(
-            (async () => {
-              const dirname = path.join(root, path.dirname(entry.path));
-              const filename = path.basename(entry.path);
-              if (!(await fs.opendir(dirname))) {
-                await fs.mkdir(dirname, { recursive: true });
-              }
-              await fs.writeFile(
-                path.join(dirname, filename),
-                entry.read(entry.bufferLength)
-              );
-            })()
-          )
-        )
-        .on("close", () => {
-          Promise.all(operations)
-            .catch(() => reject())
-            .then(() => resolve());
-        });
+    await fs.writeFile(
+      `/tmp/${uuid}.tgz`,
+      await response.Body!.transformToByteArray()
+    );
+
+    await tar.x({
+      file: `/tmp/${uuid}.tgz`,
+      C: root,
     });
   } catch (e) {
-    await git.init({ fs, dir: root, defaultBranch: "main" });
+    console.error("Error with sync", e);
+    try {
+      await git.init({ fs, dir: root, defaultBranch: "main", bare: true });
+      await uploadRepo(id, uuid);
+    } catch (e) {
+      console.log("Error with init", e);
+      throw e;
+    }
   }
 
   return uuid;
 };
 
-const applyPatch = async (uuid: string, patch: Record<string, string>) => {
-  const d = new diff_match_patch();
+const proxy = async (id: string, uuid: string, request: IncomingMessage, response: OutgoingMessage) => {
+  const translatedUrl = request.url!.replace(id, uuid)
+  const REMOTE_USER = "system";
+  const REMOTE_EMAIL = "system@startcoding.dev";
+  const dir = path.join(REPO_STORAGE_DIRECTORY, uuid)
 
-  await Promise.all(
-    Object.keys(patch).map(async (key) => {
-      const file = path.join(REPO_STORAGE_DIRECTORY, uuid, key);
+  console.log(await fs.lstat(dir))
 
-      const current = await fs
-        .readFile(file)
-        .then((buffer) => buffer.toString("utf-8"));
+  return new Promise<void>((resolve, reject) => {
+    try {
 
-      await fs.writeFile(
-        file,
-        d.patch_apply(d.patch_fromText(patch[key]), current)[0],
-        "utf8"
-      );
-    })
-  );
+      console.log(request.headers)
+      const reqStream =
+        request.headers["content-encoding"] == "gzip"
+          ? request.pipe(zlib.createGunzip())
+          : request;
+
+      const resStream = reqStream
+        .pipe(
+          backend(translatedUrl, function (err: Error, service: any) {
+            if (err) {
+              response.end(err + "\n");
+              reject();
+              return;
+            }
+
+            response.setHeader("content-type", service.type);
+
+            console.log(service.action, service.fields);
+            const ps = spawn(
+              service.cmd,
+              service.args.concat([dir]),
+              {
+                env: {
+                  REMOTE_USER,
+                  REMOTE_EMAIL,
+                  GIT_URL: translatedUrl?.slice(0, translatedUrl.indexOf(uuid)) + uuid
+                }
+              }
+            );
+            ps.stdout.pipe(service.createStream()).pipe(ps.stdin);
+            
+          })
+        );
+        
+
+        resStream.on('data', (data: any) => {
+          console.log('data')
+          console.log(data)
+        })
+        resStream.on("exit", () => {
+          console.log('exit')
+          resolve();
+        });
+        resStream.on("error", (err: Error) => {
+          console.error('error');
+          reject(err);
+        });
+
+        resStream
+        .pipe(response);
+    } catch (e) {
+      reject(e);
+    }
+  }).finally(() => console.log('resolve'));
 };
 
 export class Project {
-  private init: Promise<string>;
-  private uuid: string | null = null;
-
-  constructor(public readonly id: string) {
-    this.init = syncRepository(id).then((uuid) => (this.uuid = uuid));
+  static async init(id: string) {
+    console.log("init project");
+    const uuid = await syncRepository(id)
+    return new Project(id, uuid);
   }
 
-  private async getUUID() {
-    if (this.uuid !== null) {
-      return this.uuid;
-    } else {
-      return await this.init;
+  constructor(public readonly id: string, private uuid: string) {}
+
+  private async watch() {
+    for await (var info of fs.watch(path.join(REPO_STORAGE_DIRECTORY!, this.uuid))) {
+      uploadRepo(this.id, this.uuid)
     }
   }
 
-
-  public async save(patch: Record<string, string>) {
-    return await applyPatch(await this.getUUID(), patch);
-  }
-
-  public async upload() {
-    uploadRepo(this.id, await this.getUUID());
+  public async proxy(request: IncomingMessage, response: OutgoingMessage) {
+    console.log(`proxying request ${request.url}`);
+    const promise = proxy(this.id, this.uuid!, request, response) 
   }
 }

@@ -6,13 +6,14 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc",
-    "build": "esbuild src/index.ts --bundle --outfile=public/scripts/index.js"
+    "build": "vite build --outDir=../public src --sourcemap"
   },
   "dependencies": {
-    "@startcoding/browser-core": "*"
+    "@startcoding/browser-core": "*",
+    "buffer": "6.0.3"
   },
   "devDependencies": {
     "typescript": "5.2.2",
-    "esbuild": "0.19.3"
+    "vite": "5.1.6"
   }
 }
