@@ -8,6 +8,7 @@
     "./packages/ts-core",
     "./packages/browser-core",
     "./packages/project",
+    "./packages/renderer",
     "./packages/ui",
     "./packages/auth",
     "./services/code"

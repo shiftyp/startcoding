@@ -18,7 +18,6 @@ import { existsSync } from "fs";
 import path from "path";
 // @ts-ignore
 import streamToBlob from "stream-to-blob";
-import chokidar from "chokidar"
 
 const {
   MINIO_URL,
@@ -60,9 +59,12 @@ if (!REPO_STORAGE_DIRECTORY) {
 }
 
 const uploadRepo = async (id: string, uuid: string) => {
+  console.log('uploading')
   const root = path.join(REPO_STORAGE_DIRECTORY, uuid);
+  const stream = tar.c({ gzip: true, z: true, cwd: root }, ["./"])
+  stream.on('data', console.log)
   const blob: Blob = await streamToBlob(
-    tar.c({ gzip: true, z: true, cwd: root }, ["./"])
+    stream
   );
   const command = new PutObjectCommand({
     Bucket: MINIO_REPO_BUCKET,
@@ -70,7 +72,8 @@ const uploadRepo = async (id: string, uuid: string) => {
     Body: new Uint8Array(await blob.arrayBuffer()),
   });
 
-  client.send(command);
+  await client.send(command);
+  console.log('uploaded')
 };
 
 const syncRepository = async (id: string) => {
@@ -122,71 +125,48 @@ const syncRepository = async (id: string) => {
   return uuid;
 };
 
-const proxy = async (id: string, uuid: string, request: IncomingMessage, response: OutgoingMessage) => {
+const proxy = (id: string, uuid: string, request: IncomingMessage, response: OutgoingMessage) => {
   const translatedUrl = request.url!.replace(id, uuid)
   const REMOTE_USER = "system";
   const REMOTE_EMAIL = "system@startcoding.dev";
   const dir = path.join(REPO_STORAGE_DIRECTORY, uuid)
 
-  console.log(await fs.lstat(dir))
 
-  return new Promise<void>((resolve, reject) => {
-    try {
+  const reqStream =
+    request.headers["content-encoding"] == "gzip"
+      ? request.pipe(zlib.createGunzip())
+      : request;
 
-      console.log(request.headers)
-      const reqStream =
-        request.headers["content-encoding"] == "gzip"
-          ? request.pipe(zlib.createGunzip())
-          : request;
+  const resStream = reqStream
+    .pipe(
+      backend(translatedUrl, function (err: Error, service: any) {
+        if (err) {
+          response.end(err + "\n");
+          return;
+        }
 
-      const resStream = reqStream
-        .pipe(
-          backend(translatedUrl, function (err: Error, service: any) {
-            if (err) {
-              response.end(err + "\n");
-              reject();
-              return;
+        response.setHeader("content-type", service.type);
+
+        console.log(service.action, service.fields);
+        const ps = spawn(
+          service.cmd,
+          service.args.concat([dir]),
+          {
+            env: {
+              REMOTE_USER,
+              REMOTE_EMAIL,
+              GIT_URL: translatedUrl?.slice(0, translatedUrl.indexOf(uuid)) + uuid
             }
-
-            response.setHeader("content-type", service.type);
-
-            console.log(service.action, service.fields);
-            const ps = spawn(
-              service.cmd,
-              service.args.concat([dir]),
-              {
-                env: {
-                  REMOTE_USER,
-                  REMOTE_EMAIL,
-                  GIT_URL: translatedUrl?.slice(0, translatedUrl.indexOf(uuid)) + uuid
-                }
-              }
-            );
-            ps.stdout.pipe(service.createStream()).pipe(ps.stdin);
-            
-          })
+          }
         );
-        
+        ps.stdout.pipe(service.createStream()).pipe(ps.stdin);
 
-        resStream.on('data', (data: any) => {
-          console.log('data')
-          console.log(data)
-        })
-        resStream.on("exit", () => {
-          console.log('exit')
-          resolve();
-        });
-        resStream.on("error", (err: Error) => {
-          console.error('error');
-          reject(err);
-        });
+      })
+    );
 
-        resStream
-        .pipe(response);
-    } catch (e) {
-      reject(e);
-    }
-  }).finally(() => console.log('resolve'));
+
+  resStream
+    .pipe(response);
 };
 
 export class Project {
@@ -196,16 +176,18 @@ export class Project {
     return new Project(id, uuid);
   }
 
-  constructor(public readonly id: string, private uuid: string) {}
-
-  private async watch() {
-    for await (var info of fs.watch(path.join(REPO_STORAGE_DIRECTORY!, this.uuid))) {
-      uploadRepo(this.id, this.uuid)
-    }
-  }
+  constructor(public readonly id: string, private uuid: string) { }
 
   public async proxy(request: IncomingMessage, response: OutgoingMessage) {
     console.log(`proxying request ${request.url}`);
-    const promise = proxy(this.id, this.uuid!, request, response) 
+    try {
+      proxy(this.id, this.uuid, request, response)
+      response.on('finish', () => {
+        uploadRepo(this.id, this.uuid)
+      })
+    }
+    catch (e) {
+      console.error(e)
+    }
   }
 }

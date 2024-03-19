@@ -1,6 +1,7 @@
 {
   "name": "@startcoding/ui",
   "version": "1.0.0",
+  "type": "module",
   "types": "./dist/src/index.d.ts",
   "license": "MIT",
   "private": true,
@@ -10,6 +11,7 @@
   },
   "dependencies": {
     "@startcoding/browser-core": "*",
+    "@startcoding/renderer": "*",
     "buffer": "6.0.3"
   },
   "devDependencies": {
