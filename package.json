@@ -5,12 +5,11 @@
   "author": "Ryan Lynch <lynch.r.j@gmail.com>",
   "license": "MIT",
   "workspaces": [
-    "./packages/ts-core",
-    "./packages/browser-core",
-    "./packages/project",
-    "./packages/renderer",
-    "./packages/ui",
-    "./packages/auth",
+    "./packages/frontend/types",
+    "./packages/frontend/renderer",
+    "./packages/frontend/vm",
+    "./packages/frontend/ui",
+    "./packages/backend/project",
     "./services/code"
   ],
   "private": true

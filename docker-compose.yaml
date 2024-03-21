@@ -7,7 +7,7 @@ services:
     ports:
       - 443:443
     volumes:
-      - ./packages/ui/public:/usr/share/nginx/html
+      - ./packages/frontend/ui/public:/usr/share/nginx/html
       - ./services/web/nginx.conf:/etc/nginx/nginx.conf
       - ./data/certificates:/certificates
       - ./data/logs:/var/log
@@ -51,7 +51,7 @@ services:
       - MINIO_ACCESS_KEY=ROOTUSER
       - MINIO_SECRET_KEY=CHANGEME123
       - MINIO_REPO_BUCKET=repos
-      - REPO_STORAGE_DIRECTORY=/app/repos
+      - REPO_STORAGE_DIRECTORY=/app/data/repos
     command:
       [
         "sh",

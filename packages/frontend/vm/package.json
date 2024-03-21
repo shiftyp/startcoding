@@ -1,0 +1,26 @@
+{
+  "name": "@startcoding/vm",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "private": "true",
+  "devDependencies": {
+    "@startcoding/types": "*",
+    "typescript": "5.2.2",
+    "esbuild": "0.19.3"
+  },
+  "dependencies": {
+    "@startcoding/types": "*",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "quickjs-emscripten": "0.29.1",
+    "isomorphic-git": "1.24.5",
+    "@isomorphic-git/lightning-fs": "4.6.0",
+    "buffer": "6.0.3"
+  },
+  "scripts": {
+    "build": "tsc && esbuild ./src/game/game-index.ts --outdir=./dist/game --bundle --tsconfig=tsconfig-game.json"
+  }
+}
