@@ -1005,16 +1005,11 @@
             if (typeof key === "string" && ["x", "y", "width", "height", "angle", "radius", "size"].indexOf(
               key
             ) !== -1) {
-              if (!nodeRefreshTimeout) {
-                nodeRefreshTimeout = setTimeout(() => {
-                  registeredNodes.delete(internal.node);
-                  const node = config.makeNode(target2.descriptor);
-                  node.id = id2;
-                  internal.node = node;
-                  registeredNodes.add(node);
-                  nodeRefreshTimeout = null;
-                });
-              }
+              registeredNodes.delete(internal.node);
+              const node = config.makeNode(target2.descriptor);
+              node.id = id2;
+              internal.node = node;
+              registeredNodes.add(node);
             }
           } else {
             target2[key] = value;
