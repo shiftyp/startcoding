@@ -6,6 +6,7 @@ services:
     image: nginx
     ports:
       - 443:443
+      - 80:80
     volumes:
       - ./packages/frontend/ui/public:/usr/share/nginx/html
       - ./services/web/nginx.conf:/etc/nginx/nginx.conf
@@ -19,14 +20,14 @@ services:
     environment:
       - MINIO_ACCESS_KEY=ROOTUSER
       - MINIO_SECRET_KEY=CHANGEME123
-    volumes:
-      - "./data/minio:/data"
+    #volumes:
+    #  - "./data/minio:/data"
     image: quay.io/minio/minio
     command: server /data
 
   couchdb:
-    volumes:
-      - ./data/couchdb:/opt/couchdb/data
+    #volumes:
+    #  - ./data/couchdb:/opt/couchdb/data
     environment:
       - COUCHDB_USER=ROOTUSER
       - COUCHDB_PASSWORD=CHANGEME123
@@ -51,7 +52,7 @@ services:
       - MINIO_ACCESS_KEY=ROOTUSER
       - MINIO_SECRET_KEY=CHANGEME123
       - MINIO_REPO_BUCKET=repos
-      - REPO_STORAGE_DIRECTORY=/app/data/repos
+      - REPO_STORAGE_DIRECTORY=/tmp
     command:
       [
         "sh",

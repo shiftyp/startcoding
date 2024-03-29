@@ -8,3 +8,14 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+#play {
+  height: 1.5rem;
+}
+
+#root iframe {
+  position: absolute;
+  top: 2rem;
+  height: calc(100% - 2rem);
+  width: 100%;
+}

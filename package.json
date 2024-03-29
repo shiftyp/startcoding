@@ -6,8 +6,9 @@
   "license": "MIT",
   "workspaces": [
     "./packages/frontend/types",
-    "./packages/frontend/renderer",
     "./packages/frontend/vm",
+    "./packages/frontend/renderer",
+    "./packages/frontend/game",
     "./packages/frontend/ui",
     "./packages/backend/project",
     "./services/code"
