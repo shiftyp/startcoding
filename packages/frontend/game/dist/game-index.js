@@ -1011,7 +1011,8 @@
         y: 0,
         angle: 0,
         layer: 0,
-        hidden: false
+        hidden: false,
+        opacity: 1
       };
       const descriptor = {
         kind,
@@ -1160,6 +1161,8 @@
               removeFromLayer(target[import_types.INTERNAL].descriptor);
               target[import_types.INTERNAL].descriptor.layer = value;
               addToLayer(target[import_types.INTERNAL].descriptor);
+            } else if (key === "opacity") {
+              target[import_types.INTERNAL].descriptor.opacity = Math.max(0, Math.min(1, value));
             } else if (target[import_types.INTERNAL].descriptor.hasOwnProperty(key)) {
               target[import_types.INTERNAL].descriptor[key] = value;
               if (typeof key === "string" && [
@@ -1190,7 +1193,7 @@
       );
       for (const key of Object.keys(descriptor)) {
         if (key !== "kind")
-          proxy[key] = props[key];
+          proxy[key] = descriptor[key];
       }
       registeredElements[id2] = proxy;
       return proxy;

@@ -1,14 +1,14 @@
 import { ImageDescriptor, WorkerStageContext } from "@startcoding/types";
-import { loadImageAsset } from "../worker-cache";
+import { loadImageAsset } from "../image-cache";
 
 export const ImageSprite = (
   descriptor: ImageDescriptor,
   stageContext: WorkerStageContext
 ) => {
   const { spriteContext, fromStageX, fromStageY } = stageContext;
-  const { url, x, y, width, height, angle } = descriptor;
+  const { url, x, y, width, height, angle, opacity } = descriptor;
 
-  const image = loadImageAsset(url, "image");
+  let image = loadImageAsset(url, opacity);
 
   if (image) {
     const transform = new DOMMatrix()

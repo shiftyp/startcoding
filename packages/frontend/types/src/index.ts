@@ -46,12 +46,17 @@ export type PositionProperties = {
   layer: number;
 };
 
+export type VisibilityProperties = {
+  hidden: boolean;
+  opacity: number;
+};
+
 export type ImageDescriptor = {
   kind: "image";
   url: string;
   width: number;
   height: number;
-} & PositionProperties;
+} & PositionProperties & VisibilityProperties;
 
 export type TextDescriptor = {
   kind: "text";
@@ -59,33 +64,33 @@ export type TextDescriptor = {
   color: string;
   fontFamily: string;
   textAlign: "start" | "end" | "left" | "center" | "right";
-} & PositionProperties;
+} & PositionProperties & VisibilityProperties;
 
 export type RectangleDescriptor = {
   kind: "rectangle";
   width: number;
   height: number;
   color: string;
-} & PositionProperties;
+} & PositionProperties & VisibilityProperties;
 
 export type PolygonDescriptor = {
   kind: "polygon";
   sides: number;
   color: string;
-} & PositionProperties;
+} & PositionProperties & VisibilityProperties;
 
 export type CircleDescriptor = {
   kind: "circle";
   radius: number;
   color: string;
-} & PositionProperties;
+} & PositionProperties & VisibilityProperties;
 
 export type OvalDescriptor = {
   kind: "oval";
   width: number;
   height: number;
   color: string;
-} & PositionProperties;
+} & PositionProperties  & VisibilityProperties;
 
 export type LineDescriptor = {
   kind: "line";
@@ -93,7 +98,7 @@ export type LineDescriptor = {
   y1: number;
   width: number;
   color: string;
-} & PositionProperties;
+} & PositionProperties & VisibilityProperties;
 
 export type ElementDescriptor =
   | ImageDescriptor

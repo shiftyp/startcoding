@@ -4,7 +4,7 @@ import {
   LineDescriptor,
   WorkerStageContext,
 } from "@startcoding/types";
-import { loadImageAsset } from "../worker-cache";
+import { loadImageAsset } from "../image-cache";
 
 export const LineSprite = (
   descriptor: LineDescriptor,

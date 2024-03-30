@@ -45,13 +45,13 @@ export const clone = async (repo: string) => {
 
   await pfs.mkdir(dir)
 
-  const { hostname, protocol } = document.location
+  const { hostname, protocol, port } = document.location
 
   await git.clone({
     fs,
     http,
     dir,
-    url: `${protocol}//${hostname}/code/${repo}`,
+    url: `${protocol}//${hostname}${port ? `:${port}` : ''}/code/${repo}`,
     ref: 'main',
   })
 

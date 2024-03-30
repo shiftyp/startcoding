@@ -9,9 +9,6 @@
     "build": "tsc",
     "prepublish": "yarn build"
   },
-  "dependencies": {
-    "pixi.js": "8.0.4"
-  },
   "devDependencies": {
     "typescript": "5.2.2"
   }

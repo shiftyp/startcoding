@@ -1,14 +1,10 @@
 //import { getQuickJS, QuickJSContext } from 'quickjs-emscripten'
 import {
-  ElementDescriptor,
   EventDescriptor,
-  Listen,
   Trigger,
   Tick,
   BackdropDescriptor,
 } from '@startcoding/types'
-import Buffer from 'buffer'
-import { getGameIndex } from '@startcoding/game'
 
 let gameWorker: Worker
 

@@ -307,6 +307,7 @@ declare const execute: () => void;
       angle: 0,
       layer: 0,
       hidden: false,
+      opacity: 1
     };
 
     const descriptor = {
@@ -476,6 +477,8 @@ declare const execute: () => void;
             removeFromLayer(target[INTERNAL].descriptor);
             target[INTERNAL].descriptor.layer = value;
             addToLayer(target[INTERNAL].descriptor);
+          } else if (key === 'opacity') {
+            target[INTERNAL].descriptor.opacity = Math.max(0, Math.min(1, value))
           } else if (target[INTERNAL].descriptor.hasOwnProperty(key)) {
             target[INTERNAL].descriptor[key] = value;
 
@@ -511,7 +514,7 @@ declare const execute: () => void;
     ) as unknown as InteractiveElement<Kind>;
 
     for (const key of Object.keys(descriptor)) {
-      if (key !== "kind") proxy[key] = props[key];
+      if (key !== "kind") proxy[key] = descriptor[key];
     }
 
     registeredElements[id] = proxy;
