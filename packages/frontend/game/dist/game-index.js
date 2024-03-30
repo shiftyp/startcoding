@@ -26,6 +26,16 @@
     mod
   ));
 
+  // ../types/dist/index.js
+  var require_dist = __commonJS({
+    "../types/dist/index.js"(exports) {
+      "use strict";
+      Object.defineProperty(exports, "__esModule", { value: true });
+      exports.INTERNAL = void 0;
+      exports.INTERNAL = Symbol("internal");
+    }
+  });
+
   // ../../../node_modules/sat/SAT.js
   var require_SAT = __commonJS({
     "../../../node_modules/sat/SAT.js"(exports, module) {
@@ -815,6 +825,7 @@
   });
 
   // src/game-index.ts
+  var import_types = __toESM(require_dist(), 1);
   var import_sat = __toESM(require_SAT(), 1);
   var import_rbush = __toESM(require_rbush_min(), 1);
   (() => {
@@ -824,8 +835,9 @@
       url: "",
       style: "cover"
     };
-    const update = async (elements, tick) => {
-      const buffer = new TextEncoder().encode(JSON.stringify(elements)).buffer;
+    const update = async (tick) => {
+      const serialized = Array.from(layers.entries()).sort(([aIndex], [bIndex]) => aIndex - bIndex).map(([index, layer]) => [index, Array.from(layer)]);
+      const buffer = new TextEncoder().encode(JSON.stringify(serialized)).buffer;
       postMessage(["update", buffer, tick], { transfer: [buffer] });
     };
     const updateBackdrop = () => {
@@ -845,6 +857,10 @@
       this.splice(this.indexOf(item), 1);
     };
     const registeredElements = {};
+    const layers = /* @__PURE__ */ new Map([
+      [0, /* @__PURE__ */ new Set()]
+    ]);
+    const registeredDescriptors = {};
     const registeredNodes = /* @__PURE__ */ new Set();
     const tickCallbacks = [];
     const globalListeners = {};
@@ -852,13 +868,26 @@
     let id = 0;
     const register = (descriptor) => {
       const localId = id++;
-      registeredElements[localId] = descriptor;
+      registeredDescriptors[localId] = descriptor;
       return {
         dispose: () => {
-          delete registeredElements[localId];
+          delete registeredDescriptors[localId];
         },
         id: localId
       };
+    };
+    const removeFromLayer = (descriptor) => {
+      layers.get(descriptor.layer)?.delete(descriptor);
+      if (layers.get(descriptor.layer)?.size === 0) {
+        layers.delete(descriptor.layer);
+      }
+    };
+    const addToLayer = (descriptor) => {
+      if (!layers.has(descriptor.layer)) {
+        layers.set(descriptor.layer, /* @__PURE__ */ new Set([descriptor]));
+      } else {
+        layers.get(descriptor.layer).add(descriptor);
+      }
     };
     const listenGlobal = (descriptor, callback) => {
       globalListeners[descriptor.kind] = globalListeners[descriptor.kind] || [];
@@ -869,23 +898,12 @@
       elementListeners[descriptor.id][descriptor.kind] = elementListeners[descriptor.id][descriptor.kind] || [];
       elementListeners[descriptor.id][descriptor.kind].push(callback);
     };
+    let lastHoverIds = /* @__PURE__ */ new Set();
+    let currentHoverIds = /* @__PURE__ */ new Set();
     const trigger = (descriptor) => {
-      if (descriptor.kind === "mousedown") {
-        const searchPadding = 25;
-        const nodes = spriteTree.search({
-          minX: descriptor.x + searchPadding,
-          maxX: descriptor.x + searchPadding,
-          minY: descriptor.y + searchPadding,
-          maxY: descriptor.y + searchPadding
-        });
-        const collisionPoint = new import_sat.default.Vector(descriptor.x, descriptor.y);
-        const filteredNodes = nodes.filter((node) => {
-          if (node.collider instanceof import_sat.default.Polygon) {
-            return import_sat.default.pointInPolygon(collisionPoint, node.collider);
-          }
-        });
-        filteredNodes.forEach((node) => {
-          const listeners = elementListeners[node.id]?.[descriptor.kind];
+      if (descriptor.kind === "mousedown" || descriptor.kind === "mouseup" || descriptor.kind === "mousemove") {
+        currentHoverIds.forEach((id2) => {
+          const listeners = elementListeners[id2]?.[descriptor.kind];
           if (listeners) {
             listeners.forEach((callback) => {
               callback && callback();
@@ -906,8 +924,53 @@
       tickCallbacks.forEach((callback) => {
         callback(tick);
       });
-      update(registeredElements, tick);
+      update(tick);
     };
+    addTick((tick) => {
+      const searchPadding = 25;
+      const nodes = spriteTree.search({
+        minX: mouseX + searchPadding,
+        maxX: mouseX + searchPadding,
+        minY: mouseY + searchPadding,
+        maxY: mouseY + searchPadding
+      });
+      const collisionPoint = new import_sat.default.Vector(mouseX, mouseY);
+      lastHoverIds = currentHoverIds;
+      currentHoverIds = new Set(
+        nodes.sort((a, b) => {
+          return b.id - a.id;
+        }).filter((node) => {
+          if (node.collider instanceof import_sat.default.Polygon) {
+            return import_sat.default.pointInPolygon(collisionPoint, node.collider);
+          }
+        }).map((node) => node.id)
+      );
+      const outElementIds = (
+        // @ts-ignore
+        lastHoverIds.difference(currentHoverIds)
+      );
+      const overElementIds = (
+        // @ts-ignore
+        currentHoverIds.difference(lastHoverIds)
+      );
+      outElementIds.forEach((id2) => {
+        const listeners = elementListeners[id2]?.["mouseout"];
+        if (listeners) {
+          listeners.forEach((callback) => {
+            callback && callback();
+          });
+        }
+      });
+      overElementIds.forEach((id2) => {
+        const listeners = elementListeners[id2]?.["mouseover"];
+        if (listeners) {
+          listeners.forEach((callback) => {
+            callback && callback();
+          });
+        }
+      });
+      tick.events.forEach(trigger);
+    });
     setInterval(() => {
       const nodes = Array.from(registeredNodes.values());
       spriteTree = new import_rbush.default(50);
@@ -942,11 +1005,13 @@
         }
       });
     };
-    const InteractiveElement = (kind, props, config) => {
+    const InteractiveElement2 = (kind, props, config) => {
       const defaults = {
         x: 0,
         y: 0,
-        angle: 0
+        angle: 0,
+        layer: 0,
+        hidden: false
       };
       const descriptor = {
         kind,
@@ -958,69 +1023,176 @@
         node: {
           ...config.makeNode(descriptor),
           id: id2
-        }
-      };
-      const target = {
-        descriptor,
-        internal,
-        delete: () => {
-          registeredNodes.delete(internal.node);
-          elementListeners[id2] = {};
-          dispose();
         },
-        onMouseDown: (callback) => {
-          listenElement(
-            {
-              kind: "mousedown",
-              context: "local",
-              id: id2
-            },
-            () => {
-              config.events?.onMouseDown();
-              callback();
+        descriptor
+      };
+      const proxy = new Proxy(
+        {
+          [import_types.INTERNAL]: internal,
+          delete: () => {
+            delete registeredElements[id2];
+            registeredNodes.delete(proxy[import_types.INTERNAL].node);
+            removeFromLayer(proxy[import_types.INTERNAL].descriptor);
+            delete elementListeners[id2];
+            dispose();
+          },
+          hide: () => {
+            proxy.hidden = true;
+          },
+          show: () => {
+            proxy.hidden = false;
+          },
+          onMouseDown: (callback) => {
+            listenElement(
+              {
+                kind: "mousedown",
+                context: "local",
+                id: id2
+              },
+              () => {
+                config.events?.onMouseDown();
+                callback();
+              }
+            );
+          },
+          onMouseUp: (callback) => {
+            listenElement(
+              {
+                kind: "mouseup",
+                context: "local",
+                id: id2
+              },
+              () => {
+                config.events?.onMouseUp();
+                callback();
+              }
+            );
+          },
+          onMouseOver: (callback) => {
+            listenElement(
+              {
+                kind: "mouseover",
+                context: "local",
+                id: id2
+              },
+              () => {
+                config.events?.onMouseUp();
+                callback();
+              }
+            );
+          },
+          onMouseOut: (callback) => {
+            listenElement(
+              {
+                kind: "mouseout",
+                context: "local",
+                id: id2
+              },
+              () => {
+                config.events?.onMouseUp();
+                callback();
+              }
+            );
+          },
+          onMouseMove: (callback) => {
+            listenElement(
+              {
+                kind: "mousemove",
+                context: "local",
+                id: id2
+              },
+              () => {
+                config.events?.onMouseUp();
+                callback();
+              }
+            );
+          },
+          touching: (element) => {
+            const otherCollider = element[import_types.INTERNAL].node.collider;
+            const selfCollider = proxy[import_types.INTERNAL].node.collider;
+            if (otherCollider instanceof import_sat.default.Polygon) {
+              if (selfCollider instanceof import_sat.default.Polygon) {
+                return import_sat.default.testPolygonPolygon(otherCollider, selfCollider);
+              } else {
+                return import_sat.default.testCirclePolygon(selfCollider, otherCollider);
+              }
+            } else {
+              if (selfCollider instanceof import_sat.default.Polygon) {
+                return import_sat.default.testCirclePolygon(otherCollider, selfCollider);
+              } else {
+                return import_sat.default.testCircleCircle(otherCollider, selfCollider);
+              }
             }
-          );
-        },
-        move: (steps) => {
-          const rads = (proxy.angle || 0) / 360 * 2 * Math.PI;
-          const ratio = steps / Math.sin(Math.PI / 2);
-          const xDelta = ratio * Math.sin(Math.PI / 2 - rads);
-          const yDelta = ratio * Math.sin(rads);
-          proxy.x += xDelta;
-          proxy.y += yDelta;
-        }
-      };
-      let nodeRefreshTimeout = null;
-      const proxy = new Proxy(target, {
-        get: (target2, key) => {
-          if (target2.descriptor.hasOwnProperty(key)) {
-            return target2.descriptor[key];
-          } else {
-            return target2[key];
+          },
+          touchingElements: () => {
+            const nodes = spriteTree.search(proxy[import_types.INTERNAL].node);
+            return nodes.map(({ id: id3 }) => registeredElements[id3]).filter((element) => element).filter((element) => element.touching(proxy));
+          },
+          distanceTo: (other) => {
+            return Math.sqrt(
+              (other.x - proxy.x) * (other.x - proxy.x) + (other.y - proxy.y) * (other.y - proxy.y)
+            );
+          },
+          collideWith: (obj2) => {
+          },
+          get mousedown() {
+            return currentHoverIds.has(id2);
+          },
+          move: (steps) => {
+            const rads = (proxy.angle || 0) / 360 * 2 * Math.PI;
+            const ratio = steps / Math.sin(Math.PI / 2);
+            const xDelta = ratio * Math.sin(Math.PI / 2 - rads);
+            const yDelta = ratio * Math.sin(rads);
+            proxy.x += xDelta;
+            proxy.y += yDelta;
           }
         },
-        set: (target2, key, value) => {
-          if (target2.descriptor.hasOwnProperty(key)) {
-            target2.descriptor[key] = value;
-            if (typeof key === "string" && ["x", "y", "width", "height", "angle", "radius", "size"].indexOf(
-              key
-            ) !== -1) {
-              registeredNodes.delete(internal.node);
-              const node = config.makeNode(target2.descriptor);
-              node.id = id2;
-              internal.node = node;
-              registeredNodes.add(node);
+        {
+          get: (target, key) => {
+            if (key !== "kind" && target[import_types.INTERNAL].descriptor.hasOwnProperty(key)) {
+              return target[import_types.INTERNAL].descriptor[key];
+            } else {
+              return target[key];
             }
-          } else {
-            target2[key] = value;
+          },
+          set: (target, key, value) => {
+            if (key === "layer") {
+              removeFromLayer(target[import_types.INTERNAL].descriptor);
+              target[import_types.INTERNAL].descriptor.layer = value;
+              addToLayer(target[import_types.INTERNAL].descriptor);
+            } else if (target[import_types.INTERNAL].descriptor.hasOwnProperty(key)) {
+              target[import_types.INTERNAL].descriptor[key] = value;
+              if (typeof key === "string" && [
+                "x",
+                "y",
+                "width",
+                "height",
+                "angle",
+                "radius",
+                "size",
+                "x1",
+                "y1"
+              ].indexOf(key) !== -1) {
+                registeredNodes.delete(target[import_types.INTERNAL].node);
+                const node = config.makeNode(
+                  target[import_types.INTERNAL].descriptor
+                );
+                node.id = id2;
+                target[import_types.INTERNAL].node = node;
+                registeredNodes.add(node);
+              }
+            } else {
+              target[key] = value;
+            }
+            return true;
           }
-          return true;
         }
-      });
-      for (const key in Object.keys(descriptor)) {
+      );
+      for (const key of Object.keys(descriptor)) {
         if (key !== "kind")
           proxy[key] = props[key];
       }
+      registeredElements[id2] = proxy;
       return proxy;
     };
     globalThis.Image = function(props) {
@@ -1059,8 +1231,67 @@
         node.collider.rotate(radians);
         return node;
       };
-      return InteractiveElement(
+      return InteractiveElement2(
         "image",
+        {
+          ...defaults,
+          ...props
+        },
+        {
+          makeNode
+        }
+      );
+    };
+    globalThis.Circle = function(props) {
+      const defaults = {
+        radius: 0,
+        color: "rgb(0,0,0)"
+      };
+      const makeNode = (descriptor) => {
+        const { radius, x, y } = descriptor;
+        let node = {};
+        node.minX = descriptor.x - radius;
+        node.maxX = descriptor.x + radius;
+        node.minY = descriptor.y - radius;
+        node.maxY = descriptor.y + radius;
+        node.collider = new import_sat.default.Circle(new import_sat.default.Vector(x, y), radius);
+        return node;
+      };
+      return InteractiveElement2(
+        "circle",
+        {
+          ...defaults,
+          ...props
+        },
+        {
+          makeNode
+        }
+      );
+    };
+    globalThis.Line = function(props) {
+      const defaults = {
+        x1: 0,
+        y1: 0,
+        color: "rgb(0,0,0)",
+        width: 1
+      };
+      const makeNode = (descriptor) => {
+        const { width: width2, x, y, x1, y1 } = descriptor;
+        let node = {};
+        node.minX = Math.min(x, x1);
+        node.maxX = Math.max(x, x1);
+        node.minY = Math.min(y, y1);
+        node.maxY = Math.max(y, y1);
+        node.collider = new import_sat.default.Polygon(new import_sat.default.Vector(x, y), [
+          new import_sat.default.Vector(width2 / 2, y),
+          new import_sat.default.Vector(x1 - x + width2 / 2, y1),
+          new import_sat.default.Vector(x1 - x - width2 / 2, y1),
+          new import_sat.default.Vector(-width2 / 2, y)
+        ]);
+        return node;
+      };
+      return InteractiveElement2(
+        "line",
         {
           ...defaults,
           ...props
