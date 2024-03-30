@@ -1,4 +1,4 @@
-import { run } from "@startcoding/vm";
+import { createVM } from "@startcoding/vm";
 // @ts-ignore
 import RenderWorker from "./render-worker?worker";
 import {
@@ -38,11 +38,9 @@ renderFrame.contentDocument!.head.innerHTML = `
 `;
 
 export const game = ({
-  code,
   language,
   container,
 }: {
-  code: string;
   language: Language;
   container: HTMLElement;
 }) => {
@@ -261,7 +259,7 @@ export const game = ({
     stageContext.backgroundLayer.style.backgroundRepeat = "no-repeat";
   };
 
-  const { callTick, trigger } = run({ code, language, update, updateBackdrop });
+  const { callTick, reload } = createVM({ language, update, updateBackdrop });
 
   renderFrame.contentDocument!.addEventListener("mousemove", onmousemove);
   renderFrame.contentDocument!.addEventListener("mousedown", onmousedown);
@@ -272,4 +270,8 @@ export const game = ({
   renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
   if (renderElement.tagName === "VIDEO")
     (renderElement as HTMLVideoElement).play();
+
+  renderFrame.style.visibility = 'visible'
+
+  return { reload }
 };

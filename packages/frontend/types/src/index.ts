@@ -1,5 +1,3 @@
-import { Application, Sprite } from "pixi.js";
-
 export type Language = "javascript" | "python";
 
 export type Globals = {

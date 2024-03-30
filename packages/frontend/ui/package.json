@@ -12,7 +12,8 @@
   "dependencies": {
     "@startcoding/vm": "*",
     "@startcoding/renderer": "*",
-    "@startcoding/game": "*",
+    "@startcoding/editor": "*",
+    "@startcoding/compiler": "*",
     "buffer": "6.0.3",
     "vite-plugin-external": "4.3.0",
     "isomorphic-git": "1.24.5",

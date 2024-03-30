@@ -1,0 +1,25 @@
+{
+  "name": "@startcoding/editor",
+  "version": "1.0.0",
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "prepublish": "yarn build"
+  },
+  "dependencies": {
+    "@monaco-editor/loader": "1.4.0",
+    "@monaco-editor/react": "4.6.0",
+    "@startcoding/types": "*",
+    "monaco-editor": "0.47.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "18.2.67",
+    "@types/react-dom": "18.2.22",
+    "typescript": "5.2.2"
+  }
+}

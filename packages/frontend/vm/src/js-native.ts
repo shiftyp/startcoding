@@ -38,12 +38,10 @@ const callTick = (tick: Tick) => {
   gameWorker.postMessage(['callTick', tick])
 }
 
-export const runJS = ({
-  code,
+export const createNativeVM = ({
   update,
   updateBackdrop
 }: {
-  code: string
   update: (elements: ArrayBuffer, tick: Tick) => void,
   updateBackdrop: (backdrop: BackdropDescriptor) => void
 }) => {
@@ -51,18 +49,19 @@ export const runJS = ({
     gameWorker.terminate()
   }
 
-  const url = URL.createObjectURL(
-    new Blob([code], {
-      type: 'text/javascript',
-    })
-  )
-
-  gameWorker = new Worker(url)
-
-  connectUpdate(update, updateBackdrop)
-
   return {
     callTick,
     trigger,
+    reload: (code: string) => {
+      const url = URL.createObjectURL(
+        new Blob([code], {
+          type: 'text/javascript',
+        })
+      )
+    
+      gameWorker = new Worker(url)
+    
+      connectUpdate(update, updateBackdrop)
+    }
   }
 }

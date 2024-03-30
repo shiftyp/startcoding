@@ -1,0 +1,19 @@
+{
+  "name": "@startcoding/compiler",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "type": "module",
+  "license": "MIT",
+  "private": "true",
+  "devDependencies": {
+    "@startcoding/types": "*",
+    "@startcoding/game": "*",
+    "typescript": "5.4.3"
+  },
+  "dependencies": {
+    "typescript": "5.4.3"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}

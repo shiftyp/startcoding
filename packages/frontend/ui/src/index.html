@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="./index.css" rel="stylesheet" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="./index.css" rel="stylesheet" />
     <script src="./index.ts" type="module"></script>
-  <title>StartCoding.dev</title>
-</head>
-<body>
-  <div id="root"><iframe id="output"></iframe><button id="play">Play!</button></div>
-</body>
+    <title>StartCoding.dev</title>
+  </head>
+  <body>
+    <main id="container">
+      <section id="toolbar">
+        <button id="save">Save!</button>
+      </section>
+      <section id="panels">
+        <section id="root"><iframe id="output"></iframe><button id="play">Play!</button></section>
+        <section id="editor"></section>
+      </section>
+    </main>
+  </body>
 </html>
