@@ -13,7 +13,7 @@ export const ImageSprite = (
   if (image) {
     const transform = new DOMMatrix()
       .translateSelf(fromStageX(x), fromStageY(y), 0)
-      .rotateSelf(angle);
+      .rotateSelf(-angle - 180);
     spriteContext.setTransform(transform);
     spriteContext.drawImage(image, -width / 2, -height / 2, width, height);
   }

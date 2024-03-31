@@ -7,6 +7,7 @@ import {
   WorkerStageContext,
 } from "@startcoding/types";
 import { LineSprite } from "./components/line";
+import { TextSprite } from "./components/text";
 
 let spriteCanvas = new OffscreenCanvas(0, 0);
 let stageContext: WorkerStageContext = {
@@ -48,6 +49,9 @@ const render = (changes: ChangeSet, tick: Tick) => {
             break;
           case "line":
             LineSprite(descriptor, stageContext);
+            break;
+          case "text":
+            TextSprite(descriptor, stageContext);
             break;
         }
       }

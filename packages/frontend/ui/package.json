@@ -2,12 +2,14 @@
   "name": "@startcoding/ui",
   "version": "1.0.0",
   "type": "module",
+  "main": "./dist",
   "types": "./dist/src/index.d.ts",
   "license": "MIT",
   "private": true,
   "scripts": {
+    "clean": "rm -rf ./public/*",
     "typecheck": "tsc --noEmit",
-    "build": "tsc && vite build --outDir=../public src --sourcemap --minify=false --config ./vite.config.js"
+    "build": "yarn clean && vite build --outDir=../public src --sourcemap --minify=false --config ./vite.config.js"
   },
   "dependencies": {
     "@startcoding/vm": "*",

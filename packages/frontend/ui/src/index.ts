@@ -35,22 +35,22 @@ const main = async () => {
 
   let game: ReturnType<typeof renderGame> | null = null;
 
-  document.getElementById("play")!.addEventListener("click", async () => {
-    const [compiled] = await (await import("@startcoding/compiler")).compileIndex(code);
-    //const [compiled] = await (await import('@startcoding/compiler')).compileDebug(code)
-    //console.log(compiled)
-    game = renderGame({
+  const play = document.getElementById("play")!;
+  play.style.visibility = "visible";
+  play.addEventListener("click", async () => {
+    game = await renderGame({
       language,
       container: document.getElementById("root")!,
     });
-    game.reload(compiled);
+    await game.reload(code);
     document.getElementById("play")!.style.display = "none";
   });
 
-  document.getElementById("save")?.addEventListener("click", async () => {
+  const save = document.getElementById("save")!;
+  save.style.visibility = "visible";
+  save.addEventListener("click", async () => {
     await commit(fs, language, code, repoId);
-    const [compiled] = await (await import("@startcoding/compiler")).compileIndex(code);
-    if (game) game.reload(compiled);
+    if (game) await game.reload(code);
   });
 
   renderEditor({

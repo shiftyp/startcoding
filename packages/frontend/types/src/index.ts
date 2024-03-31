@@ -47,6 +47,7 @@ export type PositionProperties = {
 export type VisibilityProperties = {
   hidden: boolean;
   opacity: number;
+  deleted: boolean;
 };
 
 export type ImageDescriptor = {
@@ -62,6 +63,7 @@ export type TextDescriptor = {
   color: string;
   fontFamily: string;
   textAlign: "start" | "end" | "left" | "center" | "right";
+  size: number;
 } & PositionProperties & VisibilityProperties;
 
 export type RectangleDescriptor = {

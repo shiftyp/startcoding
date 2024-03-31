@@ -6,7 +6,11 @@ import {
   BackdropDescriptor,
 } from '@startcoding/types'
 
-let gameWorker: Worker
+// @ts-ignore
+import GameWorker from '@startcoding/game?worker'
+
+let lastURL: string
+const gameWorker = new GameWorker() as Worker
 
 const connectUpdate = (update: (elements: ArrayBuffer, tick: Tick) => void, updateBackdrop: (backdrop: BackdropDescriptor) => void) => {
   gameWorker.addEventListener(
@@ -38,30 +42,30 @@ const callTick = (tick: Tick) => {
   gameWorker.postMessage(['callTick', tick])
 }
 
-export const createNativeVM = ({
+export const createNativeVM = async ({
   update,
   updateBackdrop
 }: {
   update: (elements: ArrayBuffer, tick: Tick) => void,
   updateBackdrop: (backdrop: BackdropDescriptor) => void
 }) => {
-  if (gameWorker) {
-    gameWorker.terminate()
-  }
-
+  connectUpdate(update, updateBackdrop)
+  
   return {
     callTick,
     trigger,
     reload: (code: string) => {
-      const url = URL.createObjectURL(
+      if (lastURL) {
+        URL.revokeObjectURL(lastURL)
+      }
+
+      lastURL = URL.createObjectURL(
         new Blob([code], {
           type: 'text/javascript',
         })
       )
-    
-      gameWorker = new Worker(url)
-    
-      connectUpdate(update, updateBackdrop)
+
+      gameWorker.postMessage(['start', lastURL])
     }
   }
 }

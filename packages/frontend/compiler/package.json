@@ -1,8 +1,8 @@
 {
   "name": "@startcoding/compiler",
   "version": "1.0.0",
-  "main": "src/index.ts",
   "type": "module",
+  "main": "./dist/index.js",
   "license": "MIT",
   "private": "true",
   "devDependencies": {
@@ -10,8 +10,14 @@
     "@startcoding/game": "*",
     "typescript": "5.4.3"
   },
+  "exports": {
+    ".": "./dist/index.js",
+    "./compiler": "./dist/compiler/index.js",
+    "./debug-compiler": "./dist/debug_compiler/index.js"
+  },
   "dependencies": {
-    "typescript": "5.4.3"
+    "typescript": "5.4.3",
+    "ts-creator": "1.2.5"
   },
   "scripts": {
     "build": "tsc"

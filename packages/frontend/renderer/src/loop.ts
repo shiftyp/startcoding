@@ -37,7 +37,7 @@ renderFrame.contentDocument!.head.innerHTML = `
 </style>
 `;
 
-export const game = ({
+export const game = async ({
   language,
   container,
 }: {
@@ -111,8 +111,8 @@ export const game = ({
   };
 
   const onmouseleave = () => {
-    globals.mousedown = false
-  }
+    globals.mousedown = false;
+  };
 
   const onmousemove = (event: MouseEvent) => {
     globals.pMouseX = globals.mouseX;
@@ -122,23 +122,23 @@ export const game = ({
     globals.mouseY = stageContext.fromClientY(event.clientY);
 
     tickEvents.push({
-      kind: 'mousemove',
+      kind: "mousemove",
       x: stageContext.fromClientX(event.clientX),
       y: stageContext.fromClientY(event.clientY),
-    })
+    });
   };
 
   const onmousedown = (event: MouseEvent) => {
-    globals.mousedown = true
+    globals.mousedown = true;
     tickEvents.push({
       kind: "mousedown",
       x: stageContext.fromClientX(event.clientX),
       y: stageContext.fromClientY(event.clientY),
-    })
-  }
+    });
+  };
 
   const onmouseup = (event: MouseEvent) => {
-    globals.mousedown = false
+    globals.mousedown = false;
     tickEvents.push({
       kind: "mouseup",
       x: stageContext.fromClientX(event.clientX),
@@ -259,7 +259,7 @@ export const game = ({
     stageContext.backgroundLayer.style.backgroundRepeat = "no-repeat";
   };
 
-  const { callTick, reload } = createVM({ language, update, updateBackdrop });
+  const { callTick, reload } = await createVM({ language, update, updateBackdrop });
 
   renderFrame.contentDocument!.addEventListener("mousemove", onmousemove);
   renderFrame.contentDocument!.addEventListener("mousedown", onmousedown);
@@ -271,7 +271,12 @@ export const game = ({
   if (renderElement.tagName === "VIDEO")
     (renderElement as HTMLVideoElement).play();
 
-  renderFrame.style.visibility = 'visible'
+  renderFrame.style.visibility = "visible";
 
-  return { reload }
+  return {
+    reload: async (code: string) => {
+      computing = false;
+      reload(code);
+    },
+  };
 };
