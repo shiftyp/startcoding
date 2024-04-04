@@ -105,6 +105,6 @@
     }
   ],
   "files": [
-    "./src/index.ts"
+    "src/game.ts"
   ]
 }

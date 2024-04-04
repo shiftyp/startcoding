@@ -2,6 +2,7 @@ import git, { HttpClient } from "isomorphic-git";
 import LightningFS from "@isomorphic-git/lightning-fs";
 import { Language } from "@startcoding/types";
 import asyncify from 'callback-to-async-iterator'
+import { getAuth } from "firebase/auth";
 
 const createChunkCallback = (ws: WebSocket) => async (callback: (Uint8Array) => void) => {
 
@@ -94,11 +95,11 @@ export const testFile = async (fs: LightningFS, extension: "js" | "py") => {
   }
 };
 
-var rmdir = async (pfs: LightningFS["promises"], dir: string) => {
-  var list = await pfs.readdir(dir);
-  for (var i = 0; i < list.length; i++) {
-    var filename = dir + "/" + list[i];
-    var stat = await pfs.stat(filename);
+const rmdir = async (pfs: LightningFS["promises"], dir: string) => {
+  const list = await pfs.readdir(dir);
+  for (let i = 0; i < list.length; i++) {
+    const filename = dir + "/" + list[i];
+    const stat = await pfs.stat(filename);
 
     if (filename == "." || filename == "..") {
       // pass these files
@@ -137,8 +138,15 @@ export const clone = async (fs, repo: string) => {
     http,
     dir,
     url: repoUrl(repo),
-    ref: "main",
+    ref: "main"
   });
+
+  const { displayName, email } = getAuth().currentUser!;
+  await config(fs, displayName || "Anonymous", email || "Anonymous");
+
+  if (!(await testFile(fs, 'js'))) {
+    await commit(fs, 'javascript', '// Start Coding Here!!!', repo)
+  }
 
   return fs;
 };
@@ -151,9 +159,24 @@ export const commit = async (
 ) => {
   const filepath = `index.${language === "javascript" ? "js" : "py"}`;
   const fullPath = `/code/${filepath}`;
-  const current = await fs.promises.readFile(fullPath);
+  
+  let currentFile: Uint8Array | string | null
 
-  if (current !== code) {
+  try {
+    currentFile = await fs.promises.readFile(fullPath);
+  } catch(e) {
+    currentFile = null
+  }
+
+  let currentCode: string | null
+
+  if (currentFile instanceof Uint8Array) {
+    currentCode = new TextDecoder().decode(currentFile);
+  } else {
+    currentCode = currentFile
+  }
+
+  if (currentCode !== code) {
     await fs.promises.writeFile(fullPath, code);
 
     await git.add({

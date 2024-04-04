@@ -54,6 +54,23 @@ const backdropDescriptor = {
 let shouldExecute = false
 let scriptUrl = ''
 
+const difference = <T>(setA: Set<T>, setB: Set<T>): Set<T> => {
+  if (Set.prototype.hasOwnProperty('difference')) {
+    // @ts-ignore
+    return setA.difference(setB)
+  } else {
+    const ret = new Set<T>()
+
+    setA.forEach(item => {
+      if (!setB.has(item)) {
+        ret.add(item)
+      }
+    })
+
+    return ret
+  }
+}
+
 const update = async (tick: Tick) => {
   const serialized = Array.from(layers.entries())
     .sort(([aIndex], [bIndex]) => aIndex - bIndex)
@@ -222,13 +239,9 @@ const execute = async (url: string) => {
         .map((node) => node.id)
     );
   
-    const outElementIds: Set<number> =
-      // @ts-ignore
-      lastHoverIds.difference(currentHoverIds);
+    const outElementIds = difference(lastHoverIds, currentHoverIds);
   
-    const overElementIds: Set<number> =
-      // @ts-ignore
-      currentHoverIds.difference(lastHoverIds);
+    const overElementIds = difference(currentHoverIds, lastHoverIds);
   
     outElementIds.forEach((id) => {
       const listeners = elementListeners.get(id)?.get("mouseout");

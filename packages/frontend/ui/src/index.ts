@@ -32,9 +32,7 @@ const main = () => {
     const { pathname } = window.location;
     const repoId = pathname.substring(pathname.lastIndexOf("/") + 1);
     const fs = new LightningFS(repoId);
-    const { displayName, email } = getAuth().currentUser!;
     await clone(fs, repoId);
-    await config(fs, displayName || "Anonymous", email || "Anonymous");
     let file: Uint8Array;
     let language: Language;
 
@@ -83,19 +81,23 @@ const main = () => {
     });
   };
 
-  ui.start("#firebaseui-auth-container", {
-    callbacks: {
-      signInSuccessWithAuthResult: () => {
-        onSignIn();
-        return false;
+  if (!getAuth().currentUser) {
+    ui.start("#firebaseui-auth-container", {
+      callbacks: {
+        signInSuccessWithAuthResult: () => {
+          onSignIn();
+          return false;
+        },
       },
-    },
-    signInOptions: [
-      {
-        provider: EmailAuthProvider.PROVIDER_ID,
-        requireDisplayName: true,
-      },
-    ],
-  });
+      signInOptions: [
+        {
+          provider: EmailAuthProvider.PROVIDER_ID,
+          requireDisplayName: true,
+        },
+      ],
+    });
+  } else {
+    onSignIn();
+  }
 };
 main();

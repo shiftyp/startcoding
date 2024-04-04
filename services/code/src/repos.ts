@@ -18,7 +18,9 @@ const uploadRepo = async (id: string, uuid: string) => {
   const bucket = new Storage().bucket("gs://woofjs2-repos");
   const root = path.join(os.tmpdir(), uuid);
   const stream = tar.c({ gzip: true, z: true, cwd: root }, ["./"]);
+  console.log('then went here')
   const file = bucket.file(`${id}.tgz`);
+  console.log('then got here')
 
   return await new Promise((resolve, reject) => {
     const write = stream.pipe(file.createWriteStream());
@@ -37,10 +39,12 @@ const syncRepository = async (id: string) => {
     await pfs.mkdir(root);
   }
 
-  try {
-    const file = bucket.file(`${id}.tgz`);
-    const write = file.createReadStream().pipe(fs.createWriteStream(archive));
+  const file = bucket.file(`${id}.tgz`);
 
+  const [exists] = await file.exists()
+
+  if (exists) {
+    const write = file.createReadStream().pipe(fs.createWriteStream(archive));
     await new Promise<void>((resolve, reject) => {
       write.on("error", reject);
       write.on("finish", resolve);
@@ -50,7 +54,7 @@ const syncRepository = async (id: string) => {
       file: archive,
       C: root,
     });
-  } catch (e) {
+  } else {
     await git.init({ fs, dir: root, defaultBranch: "main", bare: true });
     await uploadRepo(id, uuid);
   }
