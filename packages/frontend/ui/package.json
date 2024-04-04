@@ -9,20 +9,27 @@
   "scripts": {
     "clean": "rm -rf ./public/*",
     "typecheck": "tsc --noEmit",
-    "build": "yarn clean && vite build --outDir=../public src --sourcemap --minify=false --config ./vite.config.js"
+    "build": "yarn clean && vite build --outDir=../public src --sourcemap --minify=false --config ./vite.config.js && node ./build-service-worker.js"
   },
   "dependencies": {
+    "callback-to-async-iterator": "1.1.1",
+    "firebase": "10.10.0",
+    "firebaseui": "6.1.0",
     "@startcoding/vm": "*",
     "@startcoding/renderer": "*",
     "@startcoding/editor": "*",
     "@startcoding/compiler": "*",
+    "tar-js": "0.3.0",
     "buffer": "6.0.3",
     "vite-plugin-external": "4.3.0",
     "isomorphic-git": "1.24.5",
-    "@isomorphic-git/lightning-fs": "4.6.0"
+    "@isomorphic-git/lightning-fs": "4.6.0",
+    "isomorphic-ws": "5.0.0"
   },
   "devDependencies": {
     "typescript": "5.2.2",
-    "vite": "5.1.6"
+    "vite": "5.1.6",
+    "esbuild": "0.20.2",
+    "esbuild-envfile-plugin": "1.0.5"
   }
 }

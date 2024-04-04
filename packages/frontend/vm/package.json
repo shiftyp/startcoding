@@ -2,6 +2,10 @@
   "name": "@startcoding/vm",
   "version": "1.0.0",
   "main": "src/index.ts",
+  "exports": {
+    ".": "dist/index.js",
+    "./lib": "dist/lib.d.ts"
+  },
   "type": "module",
   "license": "MIT",
   "private": "true",

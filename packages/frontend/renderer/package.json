@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@startcoding/types": "*",
-    "@startcoding/vm": "*"
+    "@startcoding/vm": "*",
+    "hex-to-hsl": "1.0.2"
   },
   "devDependencies": {
     "@types/react": "18.2.67",

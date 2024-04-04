@@ -1,0 +1,25 @@
+{
+  "hosting": {
+    "public": "./packages/frontend/ui/public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/projects/**",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/code/**",
+        "run": {
+          "serviceId": "code-service"
+        }
+      }
+    ]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

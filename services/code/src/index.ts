@@ -1,44 +1,39 @@
-import Koa, { Context } from "koa";
-import { Project } from "@startcoding/project";
-import fs from "fs";
-import express from "express";
-import http, { IncomingMessage, OutgoingMessage } from "http";
-import { SecureVersion } from "tls";
+import { WebSocketServer, createWebSocketStream } from 'ws';
+import stream from 'stream'
 
-// var privateKey = fs.readFileSync("/app/data/certificates/server.key");
-// var certificate = fs.readFileSync("/app/data/certificates/server.crt");
+import { Project } from "./repos.js";
 
-// var credentials = {
-//   key: privateKey,
-//   cert: certificate,
-//   minVersion: "TLSv1.3" as SecureVersion,
-//   maxVersion: "TLSv1.3" as SecureVersion,
-// } as const;
+const wss = new WebSocketServer( { port: parseInt(process.env.PORT!) })
 
-export const git = async (req: IncomingMessage, res:OutgoingMessage) => {
-  const id = req.url!.split('/')[1]
+wss.on('connection', ws => {
+  let stream: stream.Duplex | null = null
+  let headers: Headers | null = null
+
+  ws.on('error', console.error)
+  ws.on('message', (data, isBinary) => {
+    if (!isBinary) {
+      headers = new Headers(JSON.parse(data as unknown as string))
+      stream = createWebSocketStream(ws)
+
+      code(headers, stream)
+    }
+  })
+})
+
+export const code = async (headers: Headers, stream: stream.Duplex) => {
+  const id = headers.get('location')!.split("/")[2];
   console.log(id);
 
   if (id) {
-    const project = await Project.init(id)
-
     try {
-      await project.proxy(req, res);
+      const project = await Project.init(id)
+      await project.proxy(headers, stream);
     } catch (e) {
       console.log(e);
-      res.write(500)
+      stream.write(500);
     }
   } else {
-    console.log(`${id} Not found`)
-    res.write(404);
+    stream.write(404);
   }
 };
 
-const server = http
-  .createServer(git)
-  .on("checkContinue", (req, res) => {
-    server.emit("request", req, res);
-  })
-  .listen(8081, () => {
-    console.log('listening on 8081')
-  });

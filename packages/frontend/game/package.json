@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc",
-    "build": "esbuild ./src/game-index.js --tsconfig=./tsconfig.game.json --bundle --outdir=./dist && tsc"
+    "build": "tsc"
   },
   "dependencies": {
     "@startcoding/types": "*",

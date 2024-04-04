@@ -6,9 +6,16 @@ export const ImageSprite = (
   stageContext: WorkerStageContext
 ) => {
   const { spriteContext, fromStageX, fromStageY } = stageContext;
-  const { url, x, y, width, height, angle, opacity } = descriptor;
+  const { url, x, y, width, height, angle, opacity, colorEffect } = descriptor;
 
-  let image = loadImageAsset(url, opacity);
+  let filter = ''
+
+  if (colorEffect !== 0) {
+    const clampedColorEffect = (Math.round(colorEffect * 10) / 10) % 360
+    filter = `hue-rotate(${clampedColorEffect}deg)`
+  }
+
+  let image = loadImageAsset(url, opacity, filter);
 
   if (image) {
     const transform = new DOMMatrix()

@@ -107,7 +107,8 @@
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
   "files": [
-    "./src/service-worker.ts"
+    "./src/service-worker.ts",
+    "./src/import.meta.ts"
   ],
   "references": [
     {

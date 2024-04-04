@@ -1,7 +1,71 @@
-import http from "isomorphic-git/http/web";
-import git from "isomorphic-git";
+import git, { HttpClient } from "isomorphic-git";
 import LightningFS from "@isomorphic-git/lightning-fs";
 import { Language } from "@startcoding/types";
+import asyncify from 'callback-to-async-iterator'
+
+const createChunkCallback = (ws: WebSocket) => async (callback: (Uint8Array) => void) => {
+
+  const handleChunk = async (evt: MessageEvent) => {
+    const buffer = Buffer.from(
+      (await (evt.data as Blob).arrayBuffer()) as ArrayBuffer
+    );
+    callback(buffer);
+  };
+
+  ws.onmessage = handleChunk;
+  ws.onclose = () => callback(null)
+};
+
+const chunkGenerator = async function*(ws: WebSocket) {
+  const innerGenerator = asyncify(createChunkCallback(ws))
+
+  let next: { value: Uint8Array | null, done: boolean}
+
+  do {
+    next = await innerGenerator.next()
+    if (next.value) yield next.value
+  } while (next.value)
+}
+
+const http: HttpClient = {
+  request: async ({ url, method, headers, body }) => {
+    const ws = new WebSocket(`wss://code-service-5yng3ystqq-uc.a.run.app`);
+
+    ws.onopen = async () => {
+      ws.send(
+        JSON.stringify({
+          method,
+          location: url.slice(
+            url.indexOf(location.host) + location.host.length
+          ),
+          ...headers,
+        })
+      );
+      if (body) {
+        const iterator = body as AsyncIterable<Uint8Array>;
+
+        for await (const chunk of iterator) {
+          ws.send(chunk);
+        }
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      ws.onmessage = async (message) => {
+        resolve({
+          url: url,
+          headers: JSON.parse(await message.data.text()) as Record<
+            string,
+            string
+          >,
+          body: chunkGenerator(ws),
+          statusCode: 200,
+          statusMessage: "Ok",
+        });
+      };
+    });
+  },
+};
 
 export const config = async (
   fs: LightningFS,
@@ -55,9 +119,7 @@ const repoUrl = (repo: string) => {
   return `${protocol}//${hostname}${port ? `:${port}` : ""}/code/${repo}`;
 };
 
-export const clone = async (repo: string) => {
-  //@ts-ignore
-  const fs = new LightningFS("fs");
+export const clone = async (fs, repo: string) => {
   const pfs = fs.promises;
 
   const dir = "/code";
@@ -88,7 +150,7 @@ export const commit = async (
   repo: string
 ) => {
   const filepath = `index.${language === "javascript" ? "js" : "py"}`;
-  const fullPath = `/code/${filepath}`
+  const fullPath = `/code/${filepath}`;
   const current = await fs.promises.readFile(fullPath);
 
   if (current !== code) {

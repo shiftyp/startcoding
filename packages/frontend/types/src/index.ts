@@ -48,6 +48,7 @@ export type VisibilityProperties = {
   hidden: boolean;
   opacity: number;
   deleted: boolean;
+  colorEffect: number;
 };
 
 export type ImageDescriptor = {

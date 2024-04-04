@@ -94,7 +94,6 @@ let registeredElements: Map<number, InteractiveElement<any>>
 let layers: Map<number, Set<ElementDescriptor>> = new Map([
   [0, new Set<ElementDescriptor>()],
 ]);
-let registeredDescriptors: Map<number, ElementDescriptor>
 let registeredNodes: Set<{
   maxX: number;
   maxY: number;
@@ -110,19 +109,7 @@ let globalListeners: Map<
 >;
 let elementListeners: Map<number, Map<EventDescriptor["kind"], Set<() => void>>>
 
-let id = 0;
-
-const register = (descriptor: ElementDescriptor) => {
-  const localId = id++;
-  registeredDescriptors.set(id, descriptor);
-
-  return {
-    dispose: () => {
-      registeredDescriptors.delete(id);
-    },
-    id: localId,
-  };
-};
+let nextId = 0;
 
 const removeFromLayer = (descriptor: ElementDescriptor) => {
   layers.get(descriptor.layer)?.delete(descriptor);
@@ -203,13 +190,12 @@ const execute = async (url: string) => {
   layers = new Map([
       [0, new Set<ElementDescriptor>()],
     ]);
-  registeredDescriptors = new Map();
   registeredNodes = new Set()
   tickCallbacks = new Set();
   globalListeners = new Map;
   elementListeners = new Map();
 
-  id = 0;
+  nextId = 0;
 
   addTick((tick) => {
     const searchPadding = 25;
@@ -361,8 +347,9 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
     angle: 0,
     layer: 0,
     hidden: false,
-    opacity: 1,
+    opacity: 100,
     deleted: false,
+    colorEffect: 0
   };
 
   const descriptor = {
@@ -371,7 +358,7 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
     ...props,
   } as ElementDescriptorOfKind<Kind>;
 
-  const { dispose, id } = register(descriptor);
+  const id = nextId++;
 
   const internal = {
     node: {
@@ -394,13 +381,12 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
     {
       [INTERNAL]: internal,
       delete: () => {
-        registeredElements.delete(id);
+        registeredElements.delete(id)
         registeredNodes.delete(proxy[INTERNAL].node);
         removeFromLayer(proxy[INTERNAL].descriptor);
         elementListeners.delete(id);
         if (lastHoverIds.has(id)) lastHoverIds.delete(id)
         proxy.deleted = true;
-        dispose();
       },
       hide: () => {
         proxy.hidden = true;
@@ -552,10 +538,12 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
           target[INTERNAL].descriptor.layer = value;
           if (!deleted) addToLayer(target[INTERNAL].descriptor);
         } else if (key === "opacity") {
-          target[INTERNAL].descriptor.opacity = Math.max(
+          target[INTERNAL].descriptor.opacity = Math.round(Math.max(
             0,
-            Math.min(1, value)
-          );
+            Math.min(100, value)
+          ) * 10) / 10;
+        } else if (key === 'colorEffect') {
+          target[INTERNAL].descriptor.colorEffect = value % 360
         } else if (target[INTERNAL].descriptor.hasOwnProperty(key)) {
           target[INTERNAL].descriptor[key as keyof ElementDescriptorOfKind<Kind>] = value;
 
