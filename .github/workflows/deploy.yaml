@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Single
-        uses: ./
+      - name: build
+        uses: node
         with:
           working-directory: ./
           build: yarn workspaces run build
