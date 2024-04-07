@@ -1,10 +1,10 @@
 # StartCoding.dev
 
-A simplified [scratch](https://scratch.mit.edu) / [woofjs](https://woofjs/.com) like environment for learning to code. Currently planned for JavaScript and Python
+A simplified [scratch](https://scratch.mit.edu) / [woofjs](https://woofjs/.com) like environment for learning to code. Currently planned for JavaScrip
 
 ## **Mission**
 
-To create a WoofJS like environment, supporting multiple languages as well as front and backend functionality
+To create a WoofJS like environment, supporting javascript as well as front and backend functionality
 
 ## **Planned Components**
 
@@ -12,7 +12,6 @@ To create a WoofJS like environment, supporting multiple languages as well as fr
 2. Coding environment that exposes primitives and allows for development in supported languages
 3. Intelligent support for syntax and runtime errors through server based static code analysis tools
 4. WebGL based rendering for improved graphics performance
-5. Server based WebAssembly compiler for supported languages
 6. Additional functionality for data persistence through an ORM like interface
 
 ## **Documentation**
