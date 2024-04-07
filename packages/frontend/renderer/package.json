@@ -14,7 +14,8 @@
     "@startcoding/vm": "*",
     "hex-to-hsl": "1.0.2",
     "skmeans": "0.11.3",
-    "nlopt-js": "0.1.1"
+    "nlopt-js": "0.1.1",
+    "color-space": "2.0.1"
   },
   "devDependencies": {
     "@types/react": "18.2.67",
