@@ -42,6 +42,7 @@ export type PositionProperties = {
   angle: number;
   hidden: boolean;
   layer: number;
+  id: number;
 };
 
 export type VisibilityProperties = {
@@ -143,7 +144,7 @@ export type ElementEventCallbacks = {
 
 export type ElementSetters<Kind extends ElementDescriptor["kind"]> = {
   [K in keyof Omit<ElementDescriptorOfKind<Kind>, "kind">]?: (
-    value: ElementDescriptorOfKind<Kind>[K]
+    target: InteractiveElement<Kind>, value: ElementDescriptorOfKind<Kind>[K]
   ) => void;
 };
 
@@ -151,7 +152,7 @@ export type ElementGetters<Kind extends ElementDescriptor["kind"]> = {
   [K in keyof Omit<
     ElementDescriptorOfKind<Kind>,
     "kind"
-  >]?: () => ElementDescriptorOfKind<Kind>[K];
+  >]?: (target: InteractiveElement<Kind>) => ElementDescriptorOfKind<Kind>[K];
 };
 
 export type ElementMethods = {
@@ -180,7 +181,7 @@ export type InteractiveElement<Kind extends ElementDescriptor["kind"]> = {
 } & ElementMethods &
   ElementEvents;
 
-export type ChangeSet = Array<[number, Array<ElementDescriptor>]>;
+export type ChangeSet = Array<[number, Array<ElementDescriptor | BackdropDescriptor>]>;
 
 export type GlobalEventProperties = {
   kind: string;

@@ -76,13 +76,12 @@ const update = async (tick: Tick) => {
     .sort(([aIndex], [bIndex]) => aIndex - bIndex)
     .map(([index, layer]) => [index, Array.from(layer)]);
 
+  // @ts-ignore
+  (serialized as [number, Array<ElementDescriptor | BackdropDescriptor>][] ).unshift([-1e10, [backdropDescriptor]])
+
   const buffer = new TextEncoder().encode(JSON.stringify(serialized)).buffer;
 
   postMessage(["update", buffer, tick], { transfer: [buffer] });
-};
-
-const updateBackdrop = () => {
-  postMessage(["updateBackdrop", backdropDescriptor]);
 };
 
 onmessage = async (
@@ -308,7 +307,6 @@ self.randomY = () => {
 // @ts-ignore
 self.setBackdropURL = (url: string) => {
   backdropDescriptor.url = url;
-  updateBackdrop();
 };
 
 // @ts-ignore
@@ -354,7 +352,7 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
     getters?: ElementGetters<Kind>;
   }
 ) => {
-  const defaults: Omit<ElementDescriptor, "kind"> = {
+  const defaults: Omit<ElementDescriptor, "kind" | "id"> = {
     x: 0,
     y: 0,
     angle: 0,
@@ -365,13 +363,15 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
     colorEffect: 0
   };
 
+  const id = nextId++;
+
   const descriptor = {
     kind,
     ...defaults,
     ...props,
+    id,
   } as ElementDescriptorOfKind<Kind>;
 
-  const id = nextId++;
 
   const internal = {
     node: {
@@ -526,7 +526,7 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
         // @ts-ignore
         if (config.getters?.[key]) {
           // @ts-ignore
-          return config.getters[key]()
+          return config.getters[key](target)
         }
         if (
           key !== "kind" &&
@@ -540,10 +540,13 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
       },
       set: (target, key, value) => {
         const deleted = checkDeleted();
+        if (key === "id") {
+          return false
+        }
         // @ts-ignore
         if (config.setters?.[key]) {
           // @ts-ignore
-          config.setters[key](value)
+          config.setters[key](target, value)
           return true;
         }
         if (key === "layer") {
@@ -594,7 +597,7 @@ const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
 
   for (const key of Object.keys(descriptor)) {
     // @ts-ignore
-    if (key !== "kind") proxy[key as keyof ElementDescriptorOfKind<Kind>] = descriptor[key as keyof ElementDescriptorOfKind<Kind>];
+    if (key !== "kind" && key !== 'id') proxy[key as keyof ElementDescriptorOfKind<Kind>] = descriptor[key as keyof ElementDescriptorOfKind<Kind>];
   }
 1
   registeredElements.set(id, proxy);
@@ -790,11 +793,11 @@ self.Text =
       {
         makeNode,
         setters: {
-          text: (value: string | (() => string)) => {
+          text: (target: InteractiveElement<"text">, value: string | (() => string)) => {
             if (typeof value === 'function') {
               textFn = value
             } else {
-              proxy[INTERNAL].descriptor.text = value
+              target[INTERNAL].descriptor.text = value
               textFn = null
             }
           }

@@ -20,5 +20,5 @@ export const TextSprite = (
   const [h, s, l]  = hexToHSL(spriteContext.fillStyle) as [number, number, number]
   spriteContext.fillStyle = `HSLA(${(h + colorEffect) % 360}deg, ${s}%, ${l}%, ${(opacity / 100).toFixed(2)})`
   spriteContext.textAlign = textAlign;
-  spriteContext.strokeText(text, x, y)
+  spriteContext.fillText(text, fromStageX(x), fromStageY(y))
 };

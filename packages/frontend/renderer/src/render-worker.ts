@@ -1,13 +1,14 @@
-import { CircleSprite } from "./components/circle";
-import { ImageSprite } from "./components/image";
+import { CircleSprite } from "./canvas_components/circle";
+import { ImageSprite } from "./canvas_components/image";
 import {
   ChangeSet,
-  ElementDescriptor,
+  TextDescriptor,
   Tick,
   WorkerStageContext,
 } from "@startcoding/types";
-import { LineSprite } from "./components/line";
-import { TextSprite } from "./components/text";
+import { LineSprite } from "./canvas_components/line";
+import { TextSprite } from "./canvas_components/text";
+import { BackdropSprite } from "./canvas_components/backdrop";
 
 let spriteCanvas = new OffscreenCanvas(0, 0);
 let stageContext: WorkerStageContext = {
@@ -28,6 +29,8 @@ let stageContext: WorkerStageContext = {
   },
 };
 
+let frameIndex = 0
+
 const render = (changes: ChangeSet, tick: Tick) => {
   if (stageContext.width !== tick.globals.width) {
     stageContext.width = spriteCanvas.width = tick.globals.width;
@@ -36,10 +39,17 @@ const render = (changes: ChangeSet, tick: Tick) => {
     stageContext.height = spriteCanvas.height = tick.globals.height;
   }
 
+  const layerFrames: Array<[index: number, frame: ImageBitmap]> = []
+  const frames: Array<ImageBitmap> = []
+  const domLayerMap: Record<number, Array<TextDescriptor>> = {}
+  const domLayers: Array<[index: number, descriptors: Array<TextDescriptor>]> = []
+
   for (const layer of changes) {
     const [index, descriptors] = layer;
     for (const descriptor of descriptors) {
-      if (!descriptor.hidden) {
+      if (descriptor.kind === 'backdrop') {
+        BackdropSprite(descriptor, stageContext)
+      } else if (!descriptor.hidden) {
         switch (descriptor.kind) {
           case "image":
             ImageSprite(descriptor, stageContext);
@@ -52,15 +62,24 @@ const render = (changes: ChangeSet, tick: Tick) => {
             break;
           case "text":
             TextSprite(descriptor, stageContext);
+            if (!domLayerMap.hasOwnProperty(index)) {
+              domLayerMap[index] = []
+              domLayers.push([index, domLayerMap[index]])
+            }
+            domLayerMap[index].push(descriptor)
             break;
         }
       }
     }
+    const frame = spriteCanvas.transferToImageBitmap()
+    layerFrames.push([index, frame])
+    frames.push(frame)
   }
+  postMessage(["renderSprites", layerFrames, tick], { transfer: frames });
 
-  const frame = spriteCanvas.transferToImageBitmap();
-
-  postMessage(["renderSprites", frame, tick], { transfer: [frame] });
+  if (domLayers.length) {
+    postMessage(['renderDOMSprites', domLayers])
+  }
 };
 
 addEventListener(

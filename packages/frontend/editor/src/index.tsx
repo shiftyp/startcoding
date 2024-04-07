@@ -6,7 +6,7 @@ import { Language } from "@startcoding/types";
 // @ts-ignore
 import corelib from "@startcoding/types/lib?raw";
 
-const CodeEditor = (props: EditorProps) => {
+export const CodeEditor = (props: EditorProps) => {
   const { defaultValue } = props;
   const [storedCode, setCode] = useState(defaultValue);
 
@@ -33,30 +33,6 @@ const CodeEditor = (props: EditorProps) => {
           noSemanticValidation: false,
           noSyntaxValidation: false,
         });
-      }}
-    />
-  );
-};
-
-export const renderEditor = ({
-  container,
-  language,
-  code,
-  updateCode,
-}: {
-  container: HTMLElement;
-  language: Language;
-  code: string;
-  updateCode: (code: string) => Promise<void>;
-}) => {
-  const root = createRoot(container);
-
-  root.render(
-    <CodeEditor
-      defaultLanguage={language}
-      defaultValue={code}
-      onChange={(newCode) => {
-        updateCode(newCode!);
       }}
     />
   );

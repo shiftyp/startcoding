@@ -1,3 +1,5 @@
+@import "@flaticon/flaticon-uicons/css/regular/rounded";
+
 body {
   margin: 0;
   padding: 0;
@@ -55,11 +57,6 @@ button {
   display: block;
   height: 2.5rem;
   padding: 0.5rem;
-  visibility: hidden;
-}
-
-#save {
-  visibility: hidden;
 }
 
 #root iframe {
@@ -67,4 +64,25 @@ button {
   height: 100%;
   width: 100%;
   visibility: hidden;
+}
+
+.colorSlider .MuiSlider-rail, .colorSlider .MuiSlider-track {
+  background: linear-gradient(
+      90deg,
+      rgba(255, 0, 0, 1) 0%,
+      rgba(255, 154, 0, 1) 11%,
+      rgba(208, 222, 33, 1) 22%,
+      rgba(79, 220, 74, 1) 33%,
+      rgba(63, 218, 216, 1) 44%,
+      rgba(47, 201, 226, 1) 55%,
+      rgba(28, 127, 238, 1) 66%,
+      rgba(95, 21, 242, 1) 77%,
+      rgba(186, 12, 248, 1) 88%,
+      rgba(251, 7, 217, 1) 100%
+  );
+  background-size: 400px;
+}
+
+.colorSlider .MuiSlider-root {
+  width: 400px;
 }
