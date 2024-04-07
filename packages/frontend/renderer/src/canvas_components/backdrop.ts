@@ -13,8 +13,7 @@ export const BackdropSprite = (
 
   if (image) {
     const transform = new DOMMatrix()
-      .translateSelf(0, 0, 0);
-    spriteContext.setTransform(transform);
+    spriteContext.setTransform(transform)
     spriteContext.drawImage(image, 0, 0, width, height);
   }
 };
