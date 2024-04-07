@@ -1,7 +1,10 @@
 import { Tick } from "@startcoding/types"
+// @ts-ignore
 import skmeans from "skmeans"
+// @ts-ignore
 import colorSpace from 'color-space'
 import "./global_buffer"
+// @ts-ignore
 import nlopt from 'nlopt-js'
 
 const correctionMatrices = {
