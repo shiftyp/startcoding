@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Single
-        uses: ./
+        uses: node
         with:
           working-directory: ./
           build: yarn workspaces run build
