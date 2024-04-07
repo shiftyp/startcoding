@@ -1,0 +1,38 @@
+{
+  "name": "@startcoding/ui",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist",
+  "types": "./dist/src/index.d.ts",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "clean": "rm -rf ./public/*",
+    "typecheck": "tsc --noEmit",
+    "build": "yarn clean && vite build --outDir=../public src --sourcemap --minify=false --config ./vite.config.js && node ./build-service-worker.js"
+  },
+  "dependencies": {
+    "callback-to-async-iterator": "1.1.1",
+    "firebase": "10.10.0",
+    "firebaseui": "6.1.0",
+    "@startcoding/vm": "*",
+    "@startcoding/renderer": "*",
+    "@startcoding/editor": "*",
+    "@startcoding/compiler": "*",
+    "tar-js": "0.3.0",
+    "buffer": "6.0.3",
+    "vite-plugin-external": "4.3.0",
+    "isomorphic-git": "1.24.5",
+    "@isomorphic-git/lightning-fs": "4.6.0",
+    "@mui/joy": "5.0.0-beta.32",
+    "@emotion/react": "11.11.4",
+    "@emotion/styled": "11.11.5",
+    "@flaticon/flaticon-uicons": "3.1.0"
+  },
+  "devDependencies": {
+    "typescript": "5.2.2",
+    "vite": "5.1.6",
+    "esbuild": "0.20.2",
+    "esbuild-envfile-plugin": "1.0.5"
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Context and Problem Statement
 
-Branching makes ordering of ADRs difficult
+Branching makes ordering of ADRs difficult0007-minio-object-storage
 
 ## Decision Drivers
 
@@ -17,7 +17,6 @@ Allow for ordering of ADRs without renaming files
 Index file. 
 
 ### Consequences
-
 * Good, merging handles ordering
 * Bad, files are in alphabetical order
 
