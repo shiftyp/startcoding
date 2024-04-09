@@ -9,7 +9,7 @@ export const BackdropSprite = (
   const { url, style } = descriptor;
 
 
-  let image = loadImageAsset(url, 1, '');
+  let image = loadImageAsset(url, 100, '');
 
   if (image) {
     const transform = new DOMMatrix()

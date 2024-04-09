@@ -71,10 +71,15 @@ const render = (changes: ChangeSet, tick: Tick) => {
         }
       }
     }
-    const frame = spriteCanvas.transferToImageBitmap()
-    layerFrames.push([index, frame])
-    frames.push(frame)
+    //const frame = spriteCanvas.transferToImageBitmap()
+    //layerFrames.push([index, frame])
+    //frames.push(frame)
   }
+  const frame = spriteCanvas.transferToImageBitmap()
+  layerFrames.push([0, frame])
+  frames.push(frame)
+
+
   postMessage(["renderSprites", layerFrames, tick], { transfer: frames });
 
   if (domLayers.length) {

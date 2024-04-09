@@ -1,8 +1,7 @@
 {
   "name": "@startcoding/renderer",
   "version": "1.0.0",
-  "types": "./dist/index.d.ts",
-  "main": "./dist/index.js",
+  "main": "./src/index.ts",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -13,8 +12,8 @@
     "@startcoding/types": "*",
     "@startcoding/vm": "*",
     "hex-to-hsl": "1.0.2",
-    "skmeans": "0.11.3",
-    "nlopt-js": "0.1.1",
+    "lpsolver": "1.0.2",
+    "rgbquant": "1.1.2",
     "color-space": "2.0.1"
   },
   "devDependencies": {

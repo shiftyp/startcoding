@@ -1,11 +1,13 @@
 export default {
   envDir: '.',
   build:{
+    sourcemap: true,
     rollupOptions: {
       external: ['node-fetch']
     },
   },
   worker: {
-    format: 'es'
+    format: 'es',
+    sourcemap: true
   }
 }

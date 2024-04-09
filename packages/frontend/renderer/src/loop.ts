@@ -151,10 +151,6 @@ export const game = async ({
     },
   };
 
-  backgroundForeignObject.appendChild(stageContext.backgroundLayer);
-  
-  let frameCounter = 0
-
   renderWorker.onmessage = async (
     message: MessageEvent<
       [action: "renderSprites", data: Array<[index: number, frame: ImageBitmap]>, tick: Tick]
@@ -167,15 +163,11 @@ export const game = async ({
       tick.timing.deltaRender =
         performance.now() - tick.timing.absTime - tick.timing.deltaCompute!;
       rendering = false;
+      colorCorrectionWorker.postMessage(['doColorCorrection', colorCorrection, frames, lastRenderedTick], {
+        transfer: frames?.map(([_, frame]) => frame)
+      })
       lastRenderedTick = tick;
-      if (colorCorrection !== 'None' && (frameCounter++ % 600 === 0 || shouldUpdateColorCorrection)) {
-        shouldUpdateColorCorrection = false
-        colorCorrectionWorker.postMessage(['doColorCorrection', colorCorrection, data, tick], {
-          transfer: data.map(([_, frame]) => frame)
-        })
-      } else {
-        frames = data;
-      }
+      frames = data
     }
   };
 
@@ -235,9 +227,11 @@ export const game = async ({
   };
 
   let renderLoop: (time: number) => void;
+  let resizeElements: Array<readonly [HTMLVideoElement | HTMLCanvasElement, unknown]>
 
-  if (typeof MediaStreamTrackGenerator !== "undefined") {
+  if (false) {//typeof MediaStreamTrackGenerator !== "undefined") {
     const renderElements: Array<readonly [HTMLVideoElement, MediaStreamTrackGenerator]> = []
+    resizeElements = renderElements
     const createRenderElement = () => {
       const spriteVideo = 
         renderFrame.contentDocument!.createElement("video");
@@ -256,9 +250,11 @@ export const game = async ({
       return [spriteVideo, spriteVideoSource] as const
     }
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 1; i++) {
       renderElements.push(createRenderElement())
     }
+
+    resizeElements = renderElements
     
     renderLoop = async (now: number) => {
       if (frames && frames.length > renderElements.length) {
@@ -274,10 +270,6 @@ export const game = async ({
           if (frame && frame.width && frame.height) {
             layerElements.set(frameIndex, spriteVideo)
             const { width, height } = frame
-            spriteVideo.style.visibility = 'visible'
-            spriteVideo.height = height
-            spriteVideo.width = width
-            spriteVideo.setAttribute('data-layer', frameIndex.toString())
             const spriteVideoWriter = spriteVideoSource.writable.getWriter();
             const newVideoFrame = new VideoFrame(frame, {
               timestamp: now * 1000,
@@ -290,10 +282,13 @@ export const game = async ({
             newVideoFrame.close();
             await spriteVideoWriter.ready;
             spriteVideoWriter.releaseLock();
-          } else {
+            if (spriteVideo.style.visibility !== 'visible') {
+              spriteVideo.style.visibility = 'visible'
+            }
+          } else if (spriteVideo.style.visibility !== 'hidden') {
             spriteVideo.style.visibility = 'hidden'
           }
-        } else {
+        } else if (spriteVideo.style.visibility !== 'hidden') {
           spriteVideo.style.visibility = 'hidden'
         }
       }
@@ -305,16 +300,20 @@ export const game = async ({
       renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
     };
   } else {
-    const renderElements: Array<readonly [HTMLCanvasElement, ImageBitmapRenderingContext]> = []
+    const renderElements: Array<readonly [HTMLCanvasElement, CanvasRenderingContext2D]> = []
     const createRenderElement = () => {
-    const spriteCanvas = 
-      renderFrame.contentDocument!.createElement("canvas");
-    const spriteContext = spriteCanvas.getContext("bitmaprenderer")!;
+      const spriteCanvas = 
+        renderFrame.contentDocument!.createElement("canvas");
+      const spriteContext = spriteCanvas.getContext("2d")!;
 
-    renderFrame.contentDocument!.body.appendChild(spriteCanvas);
+      spriteCanvas.style.filter = 'url(#colorFilter)'
 
-    return [spriteCanvas, spriteContext] as const
+      renderFrame.contentDocument!.body.appendChild(spriteCanvas);
+
+      return [spriteCanvas, spriteContext] as const
     }
+
+    resizeElements = renderElements
 
     renderLoop = async (now: number) => {
       const {width, height} = stageContext
@@ -331,16 +330,7 @@ export const game = async ({
           const [frameIndex, frame] = layerFrame
           if (frame && frame.width && frame.height) {
             layerElements.set(frameIndex, spriteCanvas)
-            spriteCanvas.style.visibility = 'visible'
-
-            if (colorCorrection !== 'None') {
-              spriteCanvas.style.filter = 'url(#colorFilter)'
-            }
-
-            spriteCanvas.height = height
-            spriteCanvas.width = width
-            const copy = await createImageBitmap(frame);
-            spriteContext.transferFromImageBitmap(copy);
+            spriteContext.drawImage(frame, 0, 0);
           } else {
             spriteCanvas.style.visibility = 'hidden'
           } 
@@ -354,7 +344,7 @@ export const game = async ({
     };
   }
 
-  const gameLoop = () => {
+  const resizeLoop = () => {
     const box = renderFrame.getBoundingClientRect();
 
     if (
@@ -363,12 +353,19 @@ export const game = async ({
     ) {
       stageContext.width = box.width;
       stageContext.height = box.height;
-      backgroundForeignObject.setAttribute("height", box.height.toString())
-      backgroundForeignObject.setAttribute("width", box.width.toString())
-      backgroundSVG.setAttribute("height", box.height.toString())
-      backgroundSVG.setAttribute("width", box.width.toString())
-    }
 
+      resizeElements.forEach(([element]) => {
+        element.height = box.height
+        element.width = box.width
+      })
+    }
+  }
+
+  setInterval(resizeLoop, 500)
+
+  resizeLoop()
+
+  const gameLoop = () => {
     const now = performance.now();
     const deltaTime = now - lastTime;
 
