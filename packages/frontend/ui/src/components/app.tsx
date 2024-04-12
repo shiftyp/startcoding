@@ -101,9 +101,7 @@ export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
   }, []);
 
   useEffect(() => {
-    if (signedIn) {
       loadCode();
-    }
   }, []);
 
   useEffect(() => {
