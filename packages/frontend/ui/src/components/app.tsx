@@ -33,6 +33,7 @@ import Chip from "@mui/joy/Chip";
 import Input from "@mui/joy/Input";
 import FormLabel from "@mui/joy/FormLabel";
 import FormControl from "@mui/joy/FormControl";
+import StyledFirebaseAuth from "react-firebaseui/StyledFirebaseAuth"
 
 export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
   const [signedIn, setSignedIn] = useState(!!getAuth().currentUser);
@@ -120,23 +121,7 @@ export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
   }, [paletteUrl]);
 
   useEffect(() => {
-    if (!signedIn && loginScreen) {
-      authUI.start("#firebaseui-auth-container", {
-        callbacks: {
-          signInSuccessWithAuthResult: () => {
-            setCurrentUser(getAuth().currentUser);
-            setSignedIn(true);
-            return false;
-          },
-        },
-        signInOptions: [
-          {
-            provider: EmailAuthProvider.PROVIDER_ID,
-            requireDisplayName: true,
-          },
-        ],
-      });
-    } else {
+    if (!signedIn) {
       setSignedIn(true);
     }
   }, [loginScreen]);
@@ -410,7 +395,21 @@ export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
       ></svg>
       <Modal open={!signedIn}>
         <ModalDialog>
-          <div ref={setLoginScreen} id="firebaseui-auth-container"></div>
+          <StyledFirebaseAuth uiConfig={{
+            callbacks: {
+              signInSuccessWithAuthResult: () => {
+                setCurrentUser(getAuth().currentUser);
+                setSignedIn(true);
+                return false;
+              },
+            },
+            signInOptions: [
+              {
+                provider: EmailAuthProvider.PROVIDER_ID,
+                requireDisplayName: true,
+              },
+            ],
+          }} firebaseAuth={getAuth()}/>
         </ModalDialog>
       </Modal>
       <Skeleton loading={!signedIn && code !== null}>
