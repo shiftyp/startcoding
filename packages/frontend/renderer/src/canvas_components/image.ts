@@ -5,7 +5,7 @@ export const ImageSprite = (
   descriptor: ImageDescriptor,
   stageContext: WorkerStageContext
 ) => {
-  const { spriteContext, fromStageX, fromStageY } = stageContext;
+  const { spriteContext, fromStageX, fromStageY, colorMode } = stageContext;
   const { url, x, y, width, height, angle, opacity, colorEffect } = descriptor;
 
   let filter = ''
@@ -15,7 +15,7 @@ export const ImageSprite = (
     filter = `hue-rotate(${clampedColorEffect}deg)`
   }
 
-  let image = loadImageAsset(url, opacity, filter);
+  let image = loadImageAsset(url, opacity, filter, colorMode);
 
   if (image) {
     const transform = new DOMMatrix()

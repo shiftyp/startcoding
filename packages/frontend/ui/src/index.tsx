@@ -4,6 +4,8 @@ import { initializeApp } from "firebase/app";
 import { Buffer } from "buffer";
 import { createRoot } from 'react-dom/client'
 import { Main } from "./components/main";
+import * as firebaseui from "firebaseui";
+import { getAuth } from "firebase/auth";
 
 // @ts-ignore
 window.Buffer = Buffer;
@@ -19,10 +21,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+const authUI = new firebaseui.auth.AuthUI(getAuth())
+
 navigator.serviceWorker.register("/service-worker.js");
 
 const main = () => {
   const root = createRoot(document.getElementById('container')!)
-  root.render(<Main />)
+  root.render(<Main authUI={authUI} />)
 };
 main();

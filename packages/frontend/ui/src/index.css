@@ -80,9 +80,26 @@ button {
       rgba(186, 12, 248, 1) 88%,
       rgba(251, 7, 217, 1) 100%
   );
-  background-size: 400px;
+  background-size: 470px;
 }
 
 .colorSlider .MuiSlider-root {
-  width: 400px;
+  width: 470px;
+}
+
+.contrastSlider .MuiSlider-rail, .contrastSlider .MuiSlider-track {
+  background: linear-gradient(
+      90deg,
+      rgba(200, 200, 200, 1) 0%
+      rgba(0, 0, 0, 1) 100%,
+  );
+  background-size: 470px;
+}
+
+.contrastSlider .MuiSlider-root {
+  width: 470px;
+}
+
+.fi {
+  display: flex;
 }

@@ -2,6 +2,7 @@ import { CircleSprite } from "./canvas_components/circle";
 import { ImageSprite } from "./canvas_components/image";
 import {
   ChangeSet,
+  KIND,
   TextDescriptor,
   Tick,
   WorkerStageContext,
@@ -9,12 +10,14 @@ import {
 import { LineSprite } from "./canvas_components/line";
 import { TextSprite } from "./canvas_components/text";
 import { BackdropSprite } from "./canvas_components/backdrop";
+import { ColorMode } from 'daltonize'
 
 let spriteCanvas = new OffscreenCanvas(0, 0);
 let stageContext: WorkerStageContext = {
-  spriteContext: spriteCanvas.getContext("2d", {})!,
+  spriteContext: spriteCanvas.getContext("2d")!,
   width: 0,
   height: 0,
+  colorMode: null,
   fromStageX: (x: number) => {
     return x + (stageContext.width || 0) / 2;
   },
@@ -29,15 +32,17 @@ let stageContext: WorkerStageContext = {
   },
 };
 
-let frameIndex = 0
+let frameCounter = 1
 
-const render = (changes: ChangeSet, tick: Tick) => {
+const render = async (changes: ChangeSet, tick: Tick) => {
   if (stageContext.width !== tick.globals.width) {
     stageContext.width = spriteCanvas.width = tick.globals.width;
   }
   if (stageContext.height !== tick.globals.height) {
     stageContext.height = spriteCanvas.height = tick.globals.height;
   }
+  
+  stageContext.colorMode = tick.colorMode
 
   const layerFrames: Array<[index: number, frame: ImageBitmap]> = []
   const frames: Array<ImageBitmap> = []
@@ -46,35 +51,35 @@ const render = (changes: ChangeSet, tick: Tick) => {
 
   for (const layer of changes) {
     const [index, descriptors] = layer;
-    for (const descriptor of descriptors) {
-      if (descriptor.kind === 'backdrop') {
-        BackdropSprite(descriptor, stageContext)
-      } else if (!descriptor.hidden) {
-        switch (descriptor.kind) {
+    for (const change of descriptors) {
+      if (change.kind === 'backdrop') {
+        BackdropSprite(change.descriptor, stageContext)
+      } else if (!change.descriptor.hidden) {
+        switch (change.kind) {
           case "image":
-            ImageSprite(descriptor, stageContext);
+            ImageSprite(change.descriptor, stageContext);
             break;
           case "circle":
-            CircleSprite(descriptor, stageContext);
+            CircleSprite(change.descriptor, stageContext);
             break;
           case "line":
-            LineSprite(descriptor, stageContext);
+            LineSprite(change.descriptor, stageContext);
             break;
           case "text":
-            TextSprite(descriptor, stageContext);
+            TextSprite(change.descriptor, stageContext);
             if (!domLayerMap.hasOwnProperty(index)) {
               domLayerMap[index] = []
               domLayers.push([index, domLayerMap[index]])
             }
-            domLayerMap[index].push(descriptor)
+            domLayerMap[index].push(change.descriptor)
             break;
         }
       }
     }
-    //const frame = spriteCanvas.transferToImageBitmap()
-    //layerFrames.push([index, frame])
-    //frames.push(frame)
   }
+
+  
+
   const frame = spriteCanvas.transferToImageBitmap()
   layerFrames.push([0, frame])
   frames.push(frame)
@@ -87,18 +92,29 @@ const render = (changes: ChangeSet, tick: Tick) => {
   }
 };
 
+let colorMode: ColorMode | null = null 
+let lastChangeSet: ChangeSet | null = null
+let lastTick: Tick | null = null
+
 addEventListener(
   "message",
   async (
-    message: MessageEvent<[action: "update", changes: ArrayBuffer, tick: Tick]>
+    message: MessageEvent<[action: "update", changes: ArrayBuffer, tick: Tick] | [action: 'setColorCorrection', mode: ColorMode | null] | [action: 'rerender', colorMode: ColorMode]>
   ) => {
     const [action] = message.data;
 
     if (action === "update") {
       const [_, changes, tick] = message.data;
       const string = new TextDecoder().decode(changes);
-
-      render(JSON.parse(string) as ChangeSet, tick);
+      lastChangeSet = JSON.parse(string);
+      lastTick = tick
+      render(lastChangeSet!, lastTick!);
+    } else if (action === 'rerender') {
+      const [_, colorMode] = message.data
+      render(lastChangeSet!, {
+        ...lastTick!,
+        colorMode
+      });
     }
   }
 );

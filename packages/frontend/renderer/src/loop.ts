@@ -12,71 +12,15 @@ import {
   Tick,
 } from "@startcoding/types";
 import { createDOMRenderer } from './dom'
-
-declare class MediaStreamTrackGenerator extends MediaStreamTrack {
-  writable: WritableStream<VideoFrame>
-  constructor (options: { kind?: "video" | "audio" })
-};
+import { ColorMode } from "daltonize";
+// @ts-ignore
+import PalleteWorker from './palette_worker?worker'
+// @ts-ignore
+import flaticonFontUrl from '@flaticon/flaticon-uicons/css/regular/rounded.css?url'
 
 let renderWorker = new RenderWorker() as Worker;
-let colorCorrectionWorker = new ColorCorrectionWorker() as Worker
+let palleteWorker = new PalleteWorker() as Worker;
 
-const correctionMatrices = {
-  None: [
-    [1, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0],
-    [0, 0, 1, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Protanopia: [
-    [0.567, 0.433, 0, 0, 0],
-    [0.558, 0.442, 0, 0, 0],
-    [0, 0.242, 0.758, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Protanomaly: [
-    [0.817, 0.183, 0, 0, 0],
-    [0.333, 0.667, 0, 0, 0],
-    [0, 0.125, 0.875, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Deuteranopia: [
-    [0.625, 0.375, 0, 0, 0],
-    [0.7, 0.3, 0, 0, 0],
-    [0, 0.3, 0.7, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Deuteranomaly: [
-    [0.8, 0.2, 0, 0, 0],
-    [0.258, 0.742, 0, 0, 0],
-    [0, 0.142, 0.858, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Tritanopia: [
-    [0.95, 0.05, 0, 0, 0],
-    [0, 0.433, 0.567, 0, 0],
-    [0, 0.475, 0.525, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Tritanomaly: [
-    [0.967, 0.033, 0, 0, 0],
-    [0, 0.733, 0.267, 0, 0],
-    [0, 0.183, 0.817, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Achromatopsia: [
-    [0.299, 0.587, 0.114, 0, 0],
-    [0.299, 0.587, 0.114, 0, 0],
-    [0.299, 0.587, 0.114, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Achromatomaly: [
-    [0.618, 0.32, 0.062, 0, 0],
-    [0.163, 0.775, 0.062, 0, 0],
-    [0.163, 0.32, 0.516, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-};
 export const game = async ({
   language,
   container,
@@ -86,6 +30,7 @@ export const game = async ({
 }) => {
   const renderFrame = document.getElementById("output") as HTMLIFrameElement;
   renderFrame.contentDocument!.head.innerHTML = `
+  <link href="${flaticonFontUrl}" rel="stylesheet" />
   <style>
     body, html {
       padding: 0;
@@ -112,23 +57,39 @@ export const game = async ({
     svg div {
       position: static;
     }
+
+    .pointer-layer {
+      left: 0
+    }
+
+    .pointer {
+      display: block;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      color: white;
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+      font-size: 30px;
+      visibility: hidden;
+    }
   </style>
   `;
-  const correctionSVG = renderFrame.contentDocument!.createElementNS("http://www.w3.org/2000/svg", 'svg')
-  correctionSVG.style.display = "none"
-  renderFrame.contentDocument!.body.appendChild(correctionSVG)
-  const backgroundSVG = renderFrame.contentDocument!.createElementNS("http://www.w3.org/2000/svg", 'svg')
-  renderFrame.contentDocument!.body.appendChild(backgroundSVG)
-  const backgroundForeignObject = renderFrame.contentDocument!.createElementNS("http://www.w3.org/2000/svg", 'foreignObject')
-  backgroundSVG.appendChild(backgroundForeignObject)
+
   let frames: Array<[index: number, frame: ImageBitmap]> | null = null;
   let layerElements: Map<number, HTMLElement>
   let rendering: boolean = false;
   let computing: boolean = false;
   let lastComputedTick: Tick | null = null;
   let lastRenderedTick: Tick | null = null;
-
   let tickEvents: EventDescriptor[] = [];
+  let pointerRemap: Record<'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'CLICK', KeyboardEvent["key"]> = {} as Record<'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'CLICK', KeyboardEvent["key"]>;
+  let pointerRemapSensitivity = 10
+  let pointerLayer = renderFrame.contentDocument!.createElement("div")
+  pointerLayer.style.zIndex = (1000).toString()
+  pointerLayer.className = 'pointer-layer'
+  let pointerElement = renderFrame.contentDocument!.createElement("i")
+  pointerElement.className = "fi fi-rr-interactive pointer"
+  pointerLayer.appendChild(pointerElement)
+  let showPointerLayer = false
 
   const stageContext: StageContext = {
     container,
@@ -159,13 +120,10 @@ export const game = async ({
     const [action] = message.data;
     if (action === "renderSprites") {
       const [_, data, tick] = message.data;
-      
+
       tick.timing.deltaRender =
         performance.now() - tick.timing.absTime - tick.timing.deltaCompute!;
       rendering = false;
-      colorCorrectionWorker.postMessage(['doColorCorrection', colorCorrection, frames, lastRenderedTick], {
-        transfer: frames?.map(([_, frame]) => frame)
-      })
       lastRenderedTick = tick;
       frames = data
     }
@@ -189,6 +147,71 @@ export const game = async ({
     mouseYSpeed: 0,
     keysDown: [],
   };
+
+  renderFrame.contentDocument!.body.appendChild(pointerLayer)
+
+  setInterval(() => {
+    if (pointerRemap) {
+      for (const key of globals.keysDown) {
+        for (const action of ['UP', 'DOWN', 'LEFT', 'RIGHT', 'CLICK']) {
+          if (pointerRemap[action] && pointerRemap[action] === key) {
+            const clientX = Math.min(stageContext.width, Math.max(0, stageContext.fromStageX(globals.mouseX)))
+            const clientY = Math.min(stageContext.height, Math.max(0, stageContext.fromStageY(globals.mouseY)))
+            switch (action) {
+              case "UP":
+                onmousemove(new MouseEvent("mousemove", { clientX: clientX, clientY: Math.max(0, clientY - pointerRemapSensitivity) }))
+                break;
+              case "DOWN":
+                onmousemove(new MouseEvent("mousemove", { clientX: clientX, clientY: Math.min(stageContext.height, clientY + pointerRemapSensitivity) }))
+                break;
+              case "LEFT":
+                onmousemove(new MouseEvent("mousemove", { clientX: Math.max(0, clientX - pointerRemapSensitivity), clientY: clientY }))
+                break;
+              case "RIGHT":
+                onmousemove(new MouseEvent("mousemove", { clientX: Math.min(stageContext.width, clientX + pointerRemapSensitivity), clientY: clientY }))
+                break;
+            }
+          }
+        }
+      }
+    }
+  }, 1000 / 60)
+
+  const onkeydown = (event: KeyboardEvent) => {
+    if (!globals.keysDown.includes(event.key)) {
+      globals.keysDown.push(event.key);
+    }
+    if (pointerRemap) {
+      for (const action of ['CLICK']) {
+        if (pointerRemap[action] && pointerRemap[action] === event.key) {
+          const clientX = stageContext.fromStageX(globals.mouseX)
+          const clientY = stageContext.fromStageY(globals.mouseY)
+          switch (action) {
+            case "CLICK":
+              onmousedown(new MouseEvent("mousedown", { clientX: clientX, clientY: clientY }))
+          }
+        }
+      }
+    }
+  }
+
+  const onkeyup = (event: KeyboardEvent) => {
+    if (globals.keysDown.includes(event.key)) {
+      globals.keysDown.splice(globals.keysDown.indexOf(event.key), 1);
+    }
+    if (pointerRemap) {
+      for (const action of ['CLICK']) {
+        if (pointerRemap[action] && pointerRemap[action] === event.key) {
+          const clientX = stageContext.fromStageX(globals.mouseX)
+          const clientY = stageContext.fromStageY(globals.mouseY)
+          switch (action) {
+            case "CLICK":
+              onmouseup(new MouseEvent("mouseup", { clientX: clientX, clientY: clientY }))
+          }
+        }
+      }
+    }
+  }
 
   const onmouseleave = () => {
     globals.mousedown = false;
@@ -226,123 +249,49 @@ export const game = async ({
     });
   };
 
-  let renderLoop: (time: number) => void;
-  let resizeElements: Array<readonly [HTMLVideoElement | HTMLCanvasElement, unknown]>
+  const createRenderElement = () => {
+    const spriteCanvas =
+      renderFrame.contentDocument!.createElement("canvas");
+    const spriteContext = spriteCanvas.getContext('bitmaprenderer')!;
 
-  if (false) {//typeof MediaStreamTrackGenerator !== "undefined") {
-    const renderElements: Array<readonly [HTMLVideoElement, MediaStreamTrackGenerator]> = []
-    resizeElements = renderElements
-    const createRenderElement = () => {
-      const spriteVideo = 
-        renderFrame.contentDocument!.createElement("video");
-      const spriteVideoSource = new MediaStreamTrackGenerator({
-        kind: "video",
-      });
-      const spriteMediaStream = new MediaStream();
-      spriteMediaStream.addTrack(spriteVideoSource);
-  
-      renderFrame.contentDocument!.body.appendChild(spriteVideo);
-  
-      spriteVideo.srcObject = spriteMediaStream;
+    spriteCanvas.style.filter = 'url(#colorFilter)'
 
-      spriteVideo.play()
+    renderFrame.contentDocument!.body.appendChild(spriteCanvas);
 
-      return [spriteVideo, spriteVideoSource] as const
-    }
-
-    for (let i = 0; i < 1; i++) {
-      renderElements.push(createRenderElement())
-    }
-
-    resizeElements = renderElements
-    
-    renderLoop = async (now: number) => {
-      if (frames && frames.length > renderElements.length) {
-        throw "Too many layers"
-      }
-      layerElements = new Map()
-      for (const index in renderElements) {
-        const [spriteVideo, spriteVideoSource] = renderElements[index]
-        const layerFrame = frames && frames[index]
-
-        if (layerFrame) {
-          const [frameIndex, frame] = layerFrame
-          if (frame && frame.width && frame.height) {
-            layerElements.set(frameIndex, spriteVideo)
-            const { width, height } = frame
-            const spriteVideoWriter = spriteVideoSource.writable.getWriter();
-            const newVideoFrame = new VideoFrame(frame, {
-              timestamp: now * 1000,
-              duration: (1000 * 1000) / 60,
-              alpha: "keep",
-              displayWidth: width,
-              displayHeight: height,
-            });
-            await spriteVideoWriter.write(newVideoFrame);
-            newVideoFrame.close();
-            await spriteVideoWriter.ready;
-            spriteVideoWriter.releaseLock();
-            if (spriteVideo.style.visibility !== 'visible') {
-              spriteVideo.style.visibility = 'visible'
-            }
-          } else if (spriteVideo.style.visibility !== 'hidden') {
-            spriteVideo.style.visibility = 'hidden'
-          }
-        } else if (spriteVideo.style.visibility !== 'hidden') {
-          spriteVideo.style.visibility = 'hidden'
-        }
-      }
-
-      if (colorCorrection !== 'None') {
-        renderFrame.contentDocument!.body.style.filter = 'url(#colorFilter)'
-      }
-
-      renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
-    };
-  } else {
-    const renderElements: Array<readonly [HTMLCanvasElement, CanvasRenderingContext2D]> = []
-    const createRenderElement = () => {
-      const spriteCanvas = 
-        renderFrame.contentDocument!.createElement("canvas");
-      const spriteContext = spriteCanvas.getContext("2d")!;
-
-      spriteCanvas.style.filter = 'url(#colorFilter)'
-
-      renderFrame.contentDocument!.body.appendChild(spriteCanvas);
-
-      return [spriteCanvas, spriteContext] as const
-    }
-
-    resizeElements = renderElements
-
-    renderLoop = async (now: number) => {
-      const {width, height} = stageContext
-      if (frames && frames.length > renderElements.length) {
-        for (let i = 0; i < frames.length - renderElements.length; i++) {
-          renderElements.push(createRenderElement())
-        }
-      }
-      layerElements = new Map()
-      for (const index in renderElements) {
-        const [spriteCanvas, spriteContext] = renderElements[index]
-        const layerFrame = frames && frames[index]
-        if (layerFrame) {
-          const [frameIndex, frame] = layerFrame
-          if (frame && frame.width && frame.height) {
-            layerElements.set(frameIndex, spriteCanvas)
-            spriteContext.drawImage(frame, 0, 0);
-          } else {
-            spriteCanvas.style.visibility = 'hidden'
-          } 
-        }
-        else {
-          spriteCanvas.style.visibility = 'hidden'
-        }
-      }
-
-      renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
-    };
+    return [spriteCanvas, spriteContext] as const
   }
+
+  let renderLoop: (time: number) => void;
+  let renderElements: Array<readonly [HTMLCanvasElement, ImageBitmapRenderingContext]> = [createRenderElement()]
+
+  renderLoop = async (now: number) => {
+    if (frames && frames.length > renderElements.length) {
+      for (let i = 0; i < frames.length - renderElements.length; i++) {
+        renderElements.push(createRenderElement())
+      }
+    }
+    layerElements = new Map()
+    for (const index in renderElements) {
+      const [spriteCanvas, spriteContext] = renderElements[index]
+      const layerFrame = frames && frames[index]
+      if (layerFrame) {
+        const [frameIndex, frame] = layerFrame
+        if (frame && frame.width && frame.height) {
+          layerElements.set(frameIndex, spriteCanvas)
+          spriteContext.transferFromImageBitmap(frame);
+        }
+      }
+    }
+
+    if (showPointerLayer) {
+      pointerElement.style.visibility = 'visible'
+      pointerElement.style.left = `${stageContext.fromStageX(globals.mouseX)}px`
+      pointerElement.style.top = `${stageContext.fromStageY(globals.mouseY)}px`
+    }
+
+    debouncedUpdatePalette()
+    renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
+  };
 
   const resizeLoop = () => {
     const box = renderFrame.getBoundingClientRect();
@@ -353,13 +302,15 @@ export const game = async ({
     ) {
       stageContext.width = box.width;
       stageContext.height = box.height;
-
-      resizeElements.forEach(([element]) => {
+      
+      renderElements.forEach(([element]) => {
         element.height = box.height
         element.width = box.width
       })
     }
   }
+
+  let gameSpeed = 1
 
   setInterval(resizeLoop, 500)
 
@@ -367,40 +318,43 @@ export const game = async ({
 
   const gameLoop = () => {
     const now = performance.now();
-    const deltaTime = now - lastTime;
+    if (gameSpeed > 0 && now - lastTime >= (1000 / 60) / gameSpeed) {
+      const deltaTime = (now - lastTime) * gameSpeed;
 
-    const { width, height, fromClientX, fromClientY } = stageContext;
+      const { width, height, fromClientX, fromClientY } = stageContext;
 
-    lastTime = now;
+      lastTime = now;
 
-    globals.width = width;
-    globals.height = height;
+      globals.width = width;
+      globals.height = height;
 
-    globals.minX = fromClientX(0);
-    globals.maxX = fromClientX(width);
-    globals.minY = fromClientY(height);
-    globals.maxY = fromClientY(0);
+      globals.minX = fromClientX(0);
+      globals.maxX = fromClientX(width);
+      globals.minY = fromClientY(height);
+      globals.maxY = fromClientY(0);
 
-    const tick = {
-      timing: { absTime: now, deltaTime },
-      globals: globals,
-      events: tickEvents,
-    };
+      const tick = {
+        timing: { absTime: now, deltaTime },
+        globals: globals,
+        events: tickEvents,
+        colorMode: colorMode
+      };
 
-    if (computing === false) {
-      callTick(tick);
-      tickEvents = [];
-      computing = true;
+      if (computing === false) {
+        callTick(tick);
+        tickEvents = [];
+        computing = true;
+      }
     }
-
-    setTimeout(gameLoop, 1000 / 60);
   };
+
+  setInterval(gameLoop, 1);
 
   const update = (changes: ArrayBuffer, tick: Tick) => {
     tick.timing.deltaCompute = performance.now() - tick.timing.absTime;
     if (!rendering) {
       renderWorker.postMessage(["update", changes, tick], {
-        transfer: [changes],
+        transfer: [changes]
       });
       rendering = true;
     }
@@ -433,48 +387,76 @@ export const game = async ({
   renderFrame.contentDocument!.addEventListener("mousedown", onmousedown);
   renderFrame.contentDocument!.addEventListener("mouseup", onmouseup);
   renderFrame.contentDocument!.addEventListener("mouseleave", onmouseleave);
+  renderFrame.contentDocument!.addEventListener("keydown", onkeydown);
+  renderFrame.contentDocument!.addEventListener("keyup", onkeyup);
 
   setTimeout(gameLoop, 1000 / 60);
   renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
 
   renderFrame.style.visibility = "visible";
 
-  let colorCorrection = 'None'
-  let currentColorMatrix = correctionMatrices['None']
-  let colorCorrectionCallback = (matrix: number[][]) => {
-    currentColorMatrix = matrix
-    correctionSVG.innerHTML = `
-      <defs>
-        <filter id="colorFilter">
-          <feColorMatrix
-            in="SourceGraphic"
-            type="matrix"
-            values="${currentColorMatrix
-              .map((row) => row.join(" "))
-              .join("\n")}"
-          />
-        </filter>
-      </defs>
-      `;
+  let colorMode: ColorMode | null = null
+  let onUpdatePalette = (url: string) => {
+    URL.revokeObjectURL(url)
   }
 
-  colorCorrectionWorker.addEventListener('message', (message: MessageEvent<["updateColorCorrectionMatrix", matrix: number[][]]>) => {
+  let shouldGeneratePaletteImmediately = false
+  let shouldGeneratePalette = true
+
+  const debouncedUpdatePalette = (() => {
+    let lastUpdate: number | null = null
+    return () => {
+      const now = performance.now()
+      if (shouldGeneratePalette && (lastUpdate === null || now - lastUpdate > 2000 || shouldGeneratePaletteImmediately)) {
+        shouldGeneratePaletteImmediately = false
+        lastUpdate = now
+        requestIdleCallback(async () => {
+          const bitmaps = await Promise.all(renderElements.map(([element]) => createImageBitmap(element)))
+          palleteWorker.postMessage(['generatePalette', lastRenderedTick, bitmaps], {
+            transfer: bitmaps
+          })
+        })
+      }
+    }
+  })()
+
+  palleteWorker.addEventListener('message', (message: MessageEvent<[action: 'updatePalette', url: string]>) => {
     const [action] = message.data
-    if (action === 'updateColorCorrectionMatrix') {
-      const [_, matrix] = message.data
-      colorCorrectionCallback(matrix)
+
+    if (action === 'updatePalette') {
+      const [_, url] = message.data
+      onUpdatePalette(url)
     }
   })
 
-  let shouldUpdateColorCorrection = false
   return {
     reload: async (code: string) => {
       computing = false;
       reload(code);
+      shouldGeneratePaletteImmediately = true
     },
-    setColorCorrection: (correction: keyof typeof correctionMatrices) => {
-      colorCorrection = correction
-      shouldUpdateColorCorrection = true
+    setColorCorrection: (correction: ColorMode | null) => {
+      colorMode = correction
+      shouldGeneratePaletteImmediately = true
+
+      if (gameSpeed === 0) {
+        renderWorker.postMessage(['rerender', colorMode])
+      }
+    },
+    setGeneratePalette: (generatePalette: boolean) => {
+      shouldGeneratePalette = generatePalette
+      shouldGeneratePaletteImmediately = shouldGeneratePalette
+    },
+    onUpdatePalette: (callback: (url: string) => void) => {
+      onUpdatePalette = callback
+    },
+    setGameSpeed: (speed: number) => {
+      gameSpeed = Math.log10(speed * .9 + 10) - 1
+    },
+    setPointerRemap: (remap: typeof pointerRemap, sensitivity: number) => {
+      pointerRemap = remap
+      pointerRemapSensitivity = sensitivity
+      showPointerLayer = !!Object.keys(remap).length
     }
   };
 };

@@ -1,4 +1,9 @@
+// @ts-ignore
+import { ColorMode } from "daltonize";
 export type Language = "javascript" | "python";
+
+export const ID = Symbol("id");
+export const KIND = Symbol("kind");
 
 export type Globals = {
   mouseX: number;
@@ -26,12 +31,13 @@ export type Tick = {
   };
   globals: Globals;
   events: EventDescriptor[];
+  colorMode: ColorMode;
 };
 
 export const INTERNAL = Symbol("internal");
 
 export type BackdropDescriptor = {
-  kind: "backdrop";
+  [KIND]: "backdrop";
   url: string;
   style: "cover" | "fill";
 };
@@ -42,7 +48,6 @@ export type PositionProperties = {
   angle: number;
   hidden: boolean;
   layer: number;
-  id: number;
 };
 
 export type VisibilityProperties = {
@@ -52,55 +57,66 @@ export type VisibilityProperties = {
   colorEffect: number;
 };
 
+export type GroupDescriptor = Record<PropertyKey, any> & {
+  [KIND]: "group";
+};
+
 export type ImageDescriptor = {
-  kind: "image";
+  [KIND]: "image";
   url: string;
   width: number;
   height: number;
-} & PositionProperties & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type TextDescriptor = {
-  kind: "text";
+  [KIND]: "text";
   text: string;
   color: string;
   fontFamily: string;
   textAlign: "start" | "end" | "left" | "center" | "right";
   size: number;
-} & PositionProperties & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type RectangleDescriptor = {
-  kind: "rectangle";
+  [KIND]: "rectangle";
   width: number;
   height: number;
   color: string;
-} & PositionProperties & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type PolygonDescriptor = {
-  kind: "polygon";
+  [KIND]: "polygon";
   sides: number;
   color: string;
-} & PositionProperties & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type CircleDescriptor = {
-  kind: "circle";
+  [KIND]: "circle";
   radius: number;
   color: string;
-} & PositionProperties & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type OvalDescriptor = {
-  kind: "oval";
+  [KIND]: "oval";
   width: number;
   height: number;
   color: string;
-} & PositionProperties  & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type LineDescriptor = {
-  kind: "line";
+  [KIND]: "line";
   x1: number;
   y1: number;
   width: number;
   color: string;
-} & PositionProperties & VisibilityProperties;
+} & PositionProperties &
+  VisibilityProperties;
 
 export type ElementDescriptor =
   | ImageDescriptor
@@ -109,12 +125,14 @@ export type ElementDescriptor =
   | PolygonDescriptor
   | CircleDescriptor
   | OvalDescriptor
-  | LineDescriptor;
+  | LineDescriptor
+  | GroupDescriptor;
 
-export type ElementDescriptorOfKind<Kind extends ElementDescriptor["kind"]> =
-  ElementDescriptor & {
-    kind: Kind;
-  };
+export type ElementDescriptorOfKind<
+  Kind extends ElementDescriptor[typeof KIND]
+> = ElementDescriptor & {
+  [KIND]: Kind;
+};
 
 export type TreeNodeInfo = {
   id: number;
@@ -130,58 +148,18 @@ export type TreeNodeBounds = {
 
 export type TreeNode = TreeNodeInfo & TreeNodeBounds;
 
-export type ElementEvents = {
-  onMouseDown: (callback: () => void) => void;
-  onMouseUp: (callback: () => void) => void;
-  onMouseOver: (callback: () => void) => void;
-  onMouseOut: (callback: () => void) => void;
-  onMouseMove: (callback: () => void) => void;
-};
+export type Change =
+  | { kind: "image"; descriptor: ImageDescriptor }
+  | { kind: "circle"; descriptor: CircleDescriptor }
+  | { kind: "line"; descriptor: LineDescriptor }
+  | { kind: "text"; descriptor: TextDescriptor }
+  | { kind: "rectangle"; descriptor: RectangleDescriptor }
+  | { kind: "polygon"; descriptor: PolygonDescriptor }
+  | { kind: "oval"; descriptor: OvalDescriptor }
+  | { kind: "group"; descriptor: GroupDescriptor }
+  | { kind: "backdrop"; descriptor: BackdropDescriptor };
 
-export type ElementEventCallbacks = {
-  [K in keyof ElementEvents]: Parameters<ElementEvents[K]>[0];
-};
-
-export type ElementSetters<Kind extends ElementDescriptor["kind"]> = {
-  [K in keyof Omit<ElementDescriptorOfKind<Kind>, "kind">]?: (
-    target: InteractiveElement<Kind>, value: ElementDescriptorOfKind<Kind>[K]
-  ) => void;
-};
-
-export type ElementGetters<Kind extends ElementDescriptor["kind"]> = {
-  [K in keyof Omit<
-    ElementDescriptorOfKind<Kind>,
-    "kind"
-  >]?: (target: InteractiveElement<Kind>) => ElementDescriptorOfKind<Kind>[K];
-};
-
-export type ElementMethods = {
-  move: (steps: number) => void;
-  hide: () => void;
-  show: () => void;
-  delete: () => void;
-  touching: <Kind extends ElementDescriptor["kind"]>(
-    element: InteractiveElement<Kind>
-  ) => boolean;
-  touchingElements(): InteractiveElement<any>[];
-  distanceTo: (element: InteractiveElement<any>) => number;
-  collideWith: (element: InteractiveElement<any>) => void;
-  mousedown: boolean;
-};
-
-export type ElementInternal<Kind extends ElementDescriptor["kind"]> = {
-  node: TreeNode;
-  descriptor: ElementDescriptorOfKind<Kind>;
-};
-
-export type InteractiveElement<Kind extends ElementDescriptor["kind"]> = {
-  [INTERNAL]: ElementInternal<Kind>;
-} & {
-  [K in keyof ElementDescriptorOfKind<Kind>]: ElementDescriptorOfKind<Kind>[K];
-} & ElementMethods &
-  ElementEvents;
-
-export type ChangeSet = Array<[number, Array<ElementDescriptor | BackdropDescriptor>]>;
+export type ChangeSet = Array<[number, Array<Change>]>;
 
 export type GlobalEventProperties = {
   kind: string;
@@ -235,7 +213,9 @@ export type EventDescriptor =
   | MouseOutDescriptor
   | MouseMoveDescriptor;
 
-export type Listen = (descriptor: EventDescriptor) => {
+export type Listen = (
+  descriptor: EventDescriptor
+) => {
   remove: () => void;
 };
 
@@ -258,6 +238,7 @@ export type WorkerStageContext = {
   spriteContext: OffscreenCanvasRenderingContext2D;
   width: number;
   height: number;
+  colorMode: ColorMode | null;
   fromStageX: (x: number) => number;
   fromStageY: (y: number) => number;
   fromClientX: (x: number) => number;

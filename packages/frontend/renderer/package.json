@@ -14,7 +14,8 @@
     "hex-to-hsl": "1.0.2",
     "lpsolver": "1.0.2",
     "rgbquant": "1.1.2",
-    "color-space": "2.0.1"
+    "color-space": "2.0.1",
+    "daltonize": "1.0.2"
   },
   "devDependencies": {
     "@types/react": "18.2.67",

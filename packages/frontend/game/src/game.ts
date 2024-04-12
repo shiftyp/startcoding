@@ -1,29 +1,19 @@
 import {
-  BackdropDescriptor,
   ElementDescriptor,
   ElementDescriptorOfKind,
   EventDescriptor,
   GlobalEventProperties,
   ImageDescriptor,
-  Listen,
   TreeNode,
-  TreeNodeInfo,
   Tick,
-  Trigger,
-  ElementEventCallbacks,
-  ElementSetters,
-  ElementGetters,
-  ElementEvents,
   LocalEventProperties,
-  ElementMethods,
-  ElementInternal,
-  InteractiveElement,
   CircleDescriptor,
   LineDescriptor,
   TextDescriptor,
+  ID,
+  KIND,
+  ChangeSet
 } from "@startcoding/types";
-
-import { INTERNAL } from "@startcoding/types"
 
 import SAT from "sat";
 import RBush from "rbush";
@@ -36,6 +26,17 @@ declare const mouseX: number;
 declare const mouseY: number;
 declare const mousedown: boolean;
 
+const DESCRIPTOR = Symbol("descriptor");
+const NODE = Symbol("node");
+const NODE_PRIVATE = Symbol("nodePrivate");
+const MAKE_NODE = Symbol("makeNode");
+const RESET_NODE = Symbol("resetNode");
+const SHOULD_RENDER = Symbol("shouldRender");
+const REMOVE_TICK = Symbol("removeTick");
+const CHILDREN = Symbol("children");
+const PARENT = Symbol("parent");
+const RENDER = Symbol("render");
+
 const textCanvas = new OffscreenCanvas(0, 0);
 const textContext = textCanvas.getContext("2d")!;
 const globalMethods: Record<string, any> = {};
@@ -46,7 +47,7 @@ let spriteTree = new RBush<{
 }>();
 
 const backdropDescriptor = {
-  kind: "backdrop",
+  [KIND]: "backdrop",
   url: "",
   style: "cover",
 };
@@ -74,14 +75,18 @@ const difference = <T>(setA: Set<T>, setB: Set<T>): Set<T> => {
 const update = async (tick: Tick) => {
   const serialized = Array.from(layers.entries())
     .sort(([aIndex], [bIndex]) => aIndex - bIndex)
-    .map(([index, layer]) => [index, Array.from(layer)]);
+    .map(([index, layer]) => [index, Array.from(layer).map(({ [KIND]: kind, ...rest }) => ({ kind, descriptor: rest }))]);
 
-  // @ts-ignore
-  (serialized as [number, Array<ElementDescriptor | BackdropDescriptor>][] ).unshift([-1e10, [backdropDescriptor]])
+  if (backdropDescriptor) {
+    // @ts-expect-error
+    (serialized as ChangeSet).unshift([-1e10, [{ kind: 'backdrop', descriptor: backdropDescriptor }]])
+  }
 
   const buffer = new TextEncoder().encode(JSON.stringify(serialized)).buffer;
 
-  postMessage(["update", buffer, tick], { transfer: [buffer] });
+  postMessage(["update", buffer, tick], {
+    transfer: [buffer]
+  });
 };
 
 onmessage = async (
@@ -102,30 +107,51 @@ onmessage = async (
 };
 
 // @ts-ignore
-Array.prototype.remove = function(item) {
+Array.prototype.remove = function (item) {
   this.splice(this.indexOf(item), 1);
 };
 
-let registeredElements: Map<number, InteractiveElement<any>>
+let registeredElements: Map<number, AbstractInteractiveElement>
 let layers: Map<number, Set<ElementDescriptor>> = new Map([
   [0, new Set<ElementDescriptor>()],
 ]);
-let registeredNodes: Set<{
-  maxX: number;
-  maxY: number;
-  minX: number;
-  minY: number;
-  id: number;
-  collider: SAT.Polygon | SAT.Circle;
-}>
-let tickCallbacks: Set<(tick: Tick) => void>;
+let tickCallbacks: Map<number, Set<(tick: Tick) => void>> = new Map();
 let globalListeners: Map<
   EventDescriptor["kind"],
   Set<() => void>
->;
-let elementListeners: Map<number, Map<EventDescriptor["kind"], Set<() => void>>>
+> = new Map();
+let elementListeners: Map<number, Map<EventDescriptor["kind"], Set<() => void>>> = new Map()
 
-let nextId = 0;
+let nextId = 0
+
+const registerElement = (element: AbstractInteractiveElement) => {
+  registeredElements.set(element[ID], element)
+  addToLayer(element[DESCRIPTOR])
+}
+
+const unregisterElement = (element: AbstractInteractiveElement) => {
+  registeredElements.delete(element[ID])
+  removeFromLayer(element[DESCRIPTOR])
+  elementListeners.delete(element[ID]);
+  if (lastHoverIds.has(element[ID])) lastHoverIds.delete(element[ID])
+}
+
+let renderingGroup: GroupElement<any>[] = []
+
+const setRenderingGroup = (group: GroupElement<any>) => {
+  renderingGroup.unshift(group)
+  return () => {
+    renderingGroup.splice(renderingGroup.indexOf(group), 1)
+  }
+}
+
+const getRenderingGroup = () => {
+  return renderingGroup[0]
+}
+
+const getId = () => {
+  return nextId++
+}
 
 const removeFromLayer = (descriptor: ElementDescriptor) => {
   layers.get(descriptor.layer)?.delete(descriptor);
@@ -167,7 +193,7 @@ const listenElement = (
     elementListeners.get(descriptor.id)!.set(descriptor.kind as EventDescriptor["kind"], new Set())
     elementListeners.get(descriptor.id)!.get(descriptor.kind as EventDescriptor["kind"])!.add(callback);
   }
-  
+
 };
 
 let lastHoverIds = new Set<number>();
@@ -190,58 +216,74 @@ const trigger = (descriptor: EventDescriptor) => {
   }
 };
 
-const addTick = (callback: (tick: Tick) => void) => {
-  tickCallbacks.add(callback);
+const addTick = (callback: (tick: Tick) => void, priority: number) => {
+  if (!tickCallbacks.has(priority)) {
+    tickCallbacks.set(priority, new Set())
+  }
+
+  const callbacks = tickCallbacks.get(priority)!
+  callbacks.add(callback)
+
   return () => {
-    tickCallbacks.delete(callback)
+    callbacks.delete(callback)
   }
 };
 
 const execute = async (url: string) => {
   for (const key in Object.keys(globalMethods)) {
+    // @ts-expect-error
     self[key] = globalMethods[key]
   }
 
   registeredElements = new Map();
   layers = new Map([
-      [0, new Set<ElementDescriptor>()],
-    ]);
-  registeredNodes = new Set()
-  tickCallbacks = new Set();
-  globalListeners = new Map;
+    [0, new Set<ElementDescriptor>()],
+  ]);
+  tickCallbacks = new Map();
+  globalListeners = new Map();
   elementListeners = new Map();
 
   nextId = 0;
 
   addTick((tick) => {
-    const searchPadding = 25;
     const nodes = spriteTree.search({
-      minX: mouseX + searchPadding,
-      maxX: mouseX + searchPadding,
-      minY: mouseY + searchPadding,
-      maxY: mouseY + searchPadding,
+      minX: mouseX,
+      maxX: mouseX,
+      minY: mouseY,
+      maxY: mouseY,
     });
-  
+
     const collisionPoint = new SAT.Vector(mouseX, mouseY);
-  
+
     lastHoverIds = currentHoverIds;
-    currentHoverIds = new Set(
-      nodes
-        .sort((a, b) => {
-          return b.id - a.id;
-        })
-        .filter((node) => {
-          if (node.collider instanceof SAT.Polygon) {
-            return SAT.pointInPolygon(collisionPoint, node.collider);
+    currentHoverIds = nodes
+      .sort((a, b) => {
+        return b.id - a.id;
+      })
+      .filter((node) => {
+        if (node.collider instanceof SAT.Polygon) {
+          return SAT.pointInPolygon(collisionPoint, node.collider);
+        } else if (node.collider instanceof SAT.Circle) {
+          return SAT.pointInCircle(collisionPoint, node.collider)
+        }
+      })
+      .map((node) => node.id)
+      .reduce((acc, id) => {
+        if (registeredElements.has(id)) {
+          let element = registeredElements.get(id)!
+          while (element[PARENT] !== null) {
+            acc.add(element[PARENT])
+            element = registeredElements.get(element[PARENT])!
           }
-        })
-        .map((node) => node.id)
-    );
-  
+          acc.add(id)
+        }
+        return acc
+      }, new Set<number>())
+
     const outElementIds = difference(lastHoverIds, currentHoverIds);
-  
+
     const overElementIds = difference(currentHoverIds, lastHoverIds);
-  
+
     outElementIds.forEach((id) => {
       const listeners = elementListeners.get(id)?.get("mouseout");
       if (listeners) {
@@ -258,10 +300,10 @@ const execute = async (url: string) => {
         });
       }
     });
-  
+
     tick.events.forEach(trigger);
-  });
-  
+  }, 0);
+
   await import(url)
 }
 
@@ -279,8 +321,12 @@ const callTick = async (tick: Tick) => {
   textCanvas.height = tick.globals.height;
   textCanvas.width = tick.globals.width;
 
-  tickCallbacks.forEach((callback) => {
-    callback(tick);
+  const tickCallbackArray = Array.from(tickCallbacks.entries()).sort(([priorityA], [priorityB]) => {
+    return priorityA - priorityB
+  })
+
+  tickCallbackArray.forEach(([_, callbacks]) => {
+    callbacks.forEach(callback => callback(tick));
   });
 
   update(tick);
@@ -288,9 +334,9 @@ const callTick = async (tick: Tick) => {
 
 setInterval(() => {
   spriteTree = new RBush(50);
-  if (registeredNodes && registeredNodes.size) {
-    const nodes = Array.from(registeredNodes.values()); 
-    spriteTree.load(nodes);
+  if (registeredElements && registeredElements.size) {
+    const nodes = Array.from(registeredElements.values()).map(ele => ele[NODE]);
+    spriteTree.load(nodes.filter(node => node !== null) as TreeNode[]);
   }
 }, 10);
 
@@ -334,476 +380,619 @@ self.every = (
       callback();
       last = 0;
     }
-  });
+  }, 1);
 };
 
-const InteractiveElement = <Kind extends ElementDescriptor["kind"]>(
-  kind: Kind,
-  props: Omit<
-    ElementDescriptorOfKind<Kind>,
-    "kind" | keyof ElementDescriptor
-  >,
-  config: {
-    makeNode: (
-      descriptor: ElementDescriptorOfKind<Kind>
-    ) => Omit<TreeNode, "id">;
-    events?: ElementEventCallbacks;
-    setters?: ElementSetters<Kind>;
-    getters?: ElementGetters<Kind>;
-  }
-) => {
-  const defaults: Omit<ElementDescriptor, "kind" | "id"> = {
-    x: 0,
-    y: 0,
-    angle: 0,
-    layer: 0,
-    hidden: false,
-    opacity: 100,
-    deleted: false,
-    colorEffect: 0
-  };
+abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor[typeof KIND], 'backdrop'> = Exclude<ElementDescriptor[typeof KIND], 'backdrop'>> {
+  [ID] = getId();
+  [PARENT]: number | null = null;
 
-  const id = nextId++;
+  [NODE_PRIVATE]: TreeNode | null = null
 
-  const descriptor = {
-    kind,
-    ...defaults,
-    ...props,
-    id,
-  } as ElementDescriptorOfKind<Kind>;
+  deleted = false;
+  [DESCRIPTOR]: ElementDescriptorOfKind<Kind>
 
+  abstract [MAKE_NODE](): TreeNode | null
 
-  const internal = {
-    node: {
-      ...config.makeNode(descriptor),
-      id,
-    },
-    descriptor,
-  };
-
-  const checkDeleted = () => {
-    const { deleted } = descriptor;
-    if (deleted) {
-      console.warn("Acting on a deleted sprite");
-    }
-
-    return deleted;
-  };
-
-  const proxy = (new Proxy(
-    {
-      [INTERNAL]: internal,
-      delete: () => {
-        registeredElements.delete(id)
-        registeredNodes.delete(proxy[INTERNAL].node);
-        removeFromLayer(proxy[INTERNAL].descriptor);
-        elementListeners.delete(id);
-        if (lastHoverIds.has(id)) lastHoverIds.delete(id)
-        proxy.deleted = true;
-      },
-      hide: () => {
-        proxy.hidden = true;
-      },
-      show: () => {
-        proxy.hidden = false;
-      },
-      onMouseDown: (callback: () => void) => {
-        listenElement(
-          {
-            kind: "mousedown",
-            context: "local",
-            id,
-          },
-          () => {
-            config.events?.onMouseDown();
-            callback();
-          }
-        );
-      },
-      onMouseUp: (callback: () => void) => {
-        listenElement(
-          {
-            kind: "mouseup",
-            context: "local",
-            id,
-          },
-          () => {
-            config.events?.onMouseUp();
-            callback();
-          }
-        );
-      },
-      onMouseOver: (callback: () => void) => {
-        listenElement(
-          {
-            kind: "mouseover",
-            context: "local",
-            id,
-          },
-          () => {
-            config.events?.onMouseUp();
-            callback();
-          }
-        );
-      },
-      onMouseOut: (callback: () => void) => {
-        listenElement(
-          {
-            kind: "mouseout",
-            context: "local",
-            id,
-          },
-          () => {
-            config.events?.onMouseUp();
-            callback();
-          }
-        );
-      },
-      onMouseMove: (callback: () => void) => {
-        listenElement(
-          {
-            kind: "mousemove",
-            context: "local",
-            id,
-          },
-          () => {
-            config.events?.onMouseUp();
-            callback();
-          }
-        );
-      },
-      touching: (element: InteractiveElement<any>) => {
-        const otherCollider = element[INTERNAL].node.collider;
-        const selfCollider = proxy[INTERNAL].node.collider;
-
-        if (otherCollider instanceof SAT.Polygon) {
-          if (selfCollider instanceof SAT.Polygon) {
-            return SAT.testPolygonPolygon(otherCollider, selfCollider);
-          } else {
-            return SAT.testCirclePolygon(selfCollider, otherCollider);
-          }
-        } else {
-          if (selfCollider instanceof SAT.Polygon) {
-            return SAT.testCirclePolygon(otherCollider, selfCollider);
-          } else {
-            return SAT.testCircleCircle(otherCollider, selfCollider);
-          }
-        }
-      },
-      touchingElements: () => {
-        const nodes = spriteTree.search(proxy[INTERNAL].node);
-        return nodes
-          .map(({ id }) => registeredElements.get(id))
-          .filter((element) => element && !element.deleted && element.touching(proxy));
-      },
-      distanceTo: (other: InteractiveElement<any>) => {
-        return Math.sqrt(
-          (other.x - proxy.x) * (other.x - proxy.x) +
-            (other.y - proxy.y) * (other.y - proxy.y)
-        );
-      },
-      collideWith: (other: InteractiveElement<any>) => {
-      },
-      get mousedown() {
-        return currentHoverIds.has(id);
-      },
-      move: (steps: number) => {
-        const rads = ((proxy.angle || 0) / 360) * 2 * Math.PI;
-        const ratio = steps / Math.sin(Math.PI / 2);
-        const xDelta = ratio * Math.sin(Math.PI / 2 - rads);
-        const yDelta = ratio * Math.sin(rads);
-
-        proxy.x += xDelta;
-        proxy.y += yDelta;
-      },
-    },
-    {
-      get: (target, key) => {
-        if (key === 'deleted') {
-          return target[INTERNAL].descriptor.deleted
-        }
-        const deleted = checkDeleted();
-        // @ts-ignore
-        if (config.getters?.[key]) {
-          // @ts-ignore
-          return config.getters[key](target)
-        }
-        if (
-          key !== "kind" &&
-          target[INTERNAL].descriptor.hasOwnProperty(key)
-        ) {
-          return target[INTERNAL].descriptor[key as keyof ElementDescriptorOfKind<Kind>];
-        } else {
-          // @ts-ignore
-          return target[key as keyof InteractiveElement<Kind>];
-        }
-      },
-      set: (target, key, value) => {
-        const deleted = checkDeleted();
-        if (key === "id") {
-          return false
-        }
-        // @ts-ignore
-        if (config.setters?.[key]) {
-          // @ts-ignore
-          config.setters[key](target, value)
-          return true;
-        }
-        if (key === "layer") {
-          if (!deleted) removeFromLayer(target[INTERNAL].descriptor);
-          target[INTERNAL].descriptor.layer = value;
-          if (!deleted) addToLayer(target[INTERNAL].descriptor);
-        } else if (key === "opacity") {
-          target[INTERNAL].descriptor.opacity = Math.round(Math.max(
-            0,
-            Math.min(100, value)
-          ) * 10) / 10;
-        } else if (key === 'colorEffect') {
-          target[INTERNAL].descriptor.colorEffect = value % 360
-        } else if (target[INTERNAL].descriptor.hasOwnProperty(key)) {
-          target[INTERNAL].descriptor[key as keyof ElementDescriptorOfKind<Kind>] = value;
-
-          if (
-            typeof key === "string" &&
-            [
-              "x",
-              "y",
-              "width",
-              "height",
-              "angle",
-              "radius",
-              "size",
-              "x1",
-              "y1",
-            ].indexOf(key) !== -1
-          ) {
-            if (!deleted) registeredNodes.delete(target[INTERNAL].node);
-            const node = config.makeNode(
-              target[INTERNAL].descriptor
-            ) as TreeNode;
-            node.id = id;
-            target[INTERNAL].node = node;
-            if (!deleted) registeredNodes.add(node);
-          }
-        } else {
-          // @ts-ignore
-          target[key] = value;
-        }
-
-        return true;
-      },
-    }
-  ) as unknown) as InteractiveElement<Kind>;
-
-  for (const key of Object.keys(descriptor)) {
+  constructor(kind: Kind, descriptor: Partial<Omit<ElementDescriptorOfKind<Kind>, typeof KIND>>) {
     // @ts-ignore
-    if (key !== "kind" && key !== 'id') proxy[key as keyof ElementDescriptorOfKind<Kind>] = descriptor[key as keyof ElementDescriptorOfKind<Kind>];
+    this[DESCRIPTOR] = {
+      x: 0,
+      y: 0,
+      angle: 0,
+      layer: 0,
+      hidden: false,
+      opacity: 100,
+      deleted: false,
+      colorEffect: 0,
+      ...descriptor,
+      [KIND]: kind
+    }
+
+    if (renderingGroup.length > 0) {
+      const renderingGroup = getRenderingGroup()
+      renderingGroup[CHILDREN].push(this[ID])
+      this[PARENT] = renderingGroup[ID]
+    }
+
+    registerElement(this)
+  };
+
+  [RESET_NODE]() {
+    this[NODE_PRIVATE] = null
+  };
+
+  get [NODE]() {
+    if (this[NODE_PRIVATE] === null) {
+      const node = this[MAKE_NODE]()
+      if (node) {
+        node.id = this[ID]
+        this[NODE_PRIVATE] = node
+      }
+    }
+
+    return this[NODE_PRIVATE]
+  };
+
+  get layer() {
+    return this[DESCRIPTOR].layer
   }
-1
-  registeredElements.set(id, proxy);
 
-  return proxy;
-};
+  set layer(value) {
+    if (!this.deleted) removeFromLayer(this[DESCRIPTOR]);
+    this[DESCRIPTOR].layer = value;
+    if (!this.deleted) addToLayer(this[DESCRIPTOR]);
+  }
 
-//@ts-ignore
-self.Image = 
-  function(props: Omit<ImageDescriptor, "kind">) {
-    const defaults: Omit<ImageDescriptor, "kind" | keyof ElementDescriptor> = {
+  get x() {
+    return this[DESCRIPTOR].x
+  };
+
+  set x(value: number) {
+    this[DESCRIPTOR].x = value
+    this[RESET_NODE]()
+  };
+
+  get y() {
+    return this[DESCRIPTOR].y
+  };
+
+  set y(value) {
+    this[DESCRIPTOR].y = value
+    this[RESET_NODE]()
+  };
+
+  get angle() {
+    return this[DESCRIPTOR].angle
+  };
+
+  set angle(value) {
+    this[DESCRIPTOR].angle = value
+    this[RESET_NODE]()
+  };
+
+  get hidden() {
+    return this[DESCRIPTOR].hidden
+  };
+
+  set hidden(value) {
+    this[DESCRIPTOR].hidden = value
+  };
+
+  get opacity() {
+    return this[DESCRIPTOR].opacity
+  };
+
+  set opacity(value) {
+    this[DESCRIPTOR].opacity = Math.round(Math.max(
+      0,
+      Math.min(100, value)
+    ) * 10) / 10;
+  };
+
+  get colorEffect() {
+    return this[DESCRIPTOR].colorEffect
+  };
+
+  set colorEffect(value) {
+    this[DESCRIPTOR].colorEffect = value % 360
+  };
+
+  delete() {
+    unregisterElement(this)
+    this.deleted = true;
+  };
+
+  hide() {
+    this.hidden = true;
+  };
+  show() {
+    this.hidden = false;
+  };
+  onMouseDown(callback: () => void) {
+    listenElement(
+      {
+        kind: "mousedown",
+        context: "local",
+        id: this[ID],
+      },
+      () => {
+        callback();
+      }
+    );
+  };
+  onMouseUp(callback: () => void) {
+    listenElement(
+      {
+        kind: "mouseup",
+        context: "local",
+        id: this[ID],
+      },
+      () => {
+        callback();
+      }
+    );
+  };
+  onMouseOver(callback: () => void) {
+    listenElement(
+      {
+        kind: "mouseover",
+        context: "local",
+        id: this[ID],
+      },
+      () => {
+        callback();
+      }
+    );
+  };
+  onMouseOut(callback: () => void) {
+    listenElement(
+      {
+        kind: "mouseout",
+        context: "local",
+        id: this[ID],
+      },
+      () => {
+        callback();
+      }
+    );
+  };
+  onMouseMove(callback: () => void) {
+    listenElement(
+      {
+        kind: "mousemove",
+        context: "local",
+        id: this[ID],
+      },
+      () => {
+        callback();
+      }
+    );
+  };
+  touching(element: AbstractInteractiveElement) {
+    if (this[NODE] === null || element[NODE] === null) return false
+    const otherCollider = element[NODE].collider;
+    const selfCollider = this[NODE].collider;
+
+    if (otherCollider instanceof SAT.Polygon) {
+      if (selfCollider instanceof SAT.Polygon) {
+        return SAT.testPolygonPolygon(otherCollider, selfCollider);
+      } else {
+        return SAT.testCirclePolygon(selfCollider, otherCollider);
+      }
+    } else {
+      if (selfCollider instanceof SAT.Polygon) {
+        return SAT.testCirclePolygon(otherCollider, selfCollider);
+      } else {
+        return SAT.testCircleCircle(otherCollider, selfCollider);
+      }
+    }
+  };
+  touchingElements(): AbstractInteractiveElement[] {
+    if (this[NODE] === null) return [];
+    const nodes = spriteTree.search(this[NODE]);
+    return nodes
+      .map(({ id }) => registeredElements.get(id))
+      .filter((element) => element && !element.deleted && element.touching(this)) as AbstractInteractiveElement[];
+  };
+  collideWith(element: AbstractInteractiveElement) { };
+  distanceTo(other: AbstractInteractiveElement) {
+    return Math.sqrt(
+      (other.x - this.x) * (other.x - this.x) +
+      (other.y - this.y) * (other.y - this.y)
+    );
+  };
+  get mousedown() {
+    return currentHoverIds.has(this[ID]);
+  };
+  move(steps: number) {
+    const rads = ((this.angle || 0) / 360) * 2 * Math.PI;
+    const ratio = steps / Math.sin(Math.PI / 2);
+    const xDelta = ratio * Math.sin(Math.PI / 2 - rads);
+    const yDelta = ratio * Math.sin(rads);
+
+    this.x += xDelta;
+    this.y += yDelta;
+  };
+}
+
+class ImageElement extends AbstractInteractiveElement<'image'> {
+  constructor(descriptor: Partial<Omit<ImageDescriptor, typeof KIND>>) {
+    super('image', {
       width: 0,
       height: 0,
       url: "",
-    };
-
-    const makeNode = (descriptor: ImageDescriptor) => {
-      let node: TreeNode = {} as TreeNode;
-
-      const radians = (descriptor.angle / 360) * 2 * Math.PI;
-      let constrainedAngle = Math.abs(radians % Math.PI);
-      let nodeWidth: number;
-      let nodeHeight: number;
-
-      if (Math.abs(constrainedAngle) < Math.PI / 2) {
-        nodeWidth =
-          width * Math.cos(constrainedAngle) +
-          height * Math.sin(constrainedAngle);
-        nodeHeight =
-          width * Math.sin(constrainedAngle) +
-          height * Math.cos(constrainedAngle);
-      } else {
-        const adjustedAngle = constrainedAngle - Math.PI / 2;
-        nodeWidth =
-          height * Math.cos(adjustedAngle) + width * Math.sin(adjustedAngle);
-        nodeHeight =
-          height * Math.sin(adjustedAngle) + width * Math.cos(adjustedAngle);
-      }
-
-      node.minX = descriptor.x - nodeWidth / 2;
-      node.maxX = descriptor.x + nodeHeight / 2;
-      node.minY = descriptor.y - nodeWidth / 2;
-      node.maxY = descriptor.y + nodeHeight / 2;
-
-      node.collider = new SAT.Polygon(
-        new SAT.Vector(descriptor.x, descriptor.y),
-        [
-          new SAT.Vector(-descriptor.width / 2, -descriptor.height / 2),
-          new SAT.Vector(descriptor.width, 0),
-          new SAT.Vector(0, descriptor.height),
-          new SAT.Vector(-descriptor.width, 0),
-        ]
-      );
-
-      node.collider.rotate(radians);
-
-      return node;
-    };
-
-    return InteractiveElement(
-      "image",
-      {
-        ...defaults,
-        ...props,
-      },
-      {
-        makeNode,
-      }
-    );
+      ...descriptor
+    })
   };
 
-  // @ts-ignore
-self.Circle =
-  function(props: Omit<CircleDescriptor, "kind">) {
-    const defaults: Omit<CircleDescriptor, "kind" | keyof ElementDescriptor> = {
+  [MAKE_NODE]() {
+    let node: TreeNode = {} as TreeNode;
+
+    const radians = (this[DESCRIPTOR].angle / 360) * 2 * Math.PI;
+    let constrainedAngle = Math.abs(radians % Math.PI);
+    let nodeWidth: number;
+    let nodeHeight: number;
+
+    if (Math.abs(constrainedAngle) < Math.PI / 2) {
+      nodeWidth =
+        width * Math.cos(constrainedAngle) +
+        height * Math.sin(constrainedAngle);
+      nodeHeight =
+        width * Math.sin(constrainedAngle) +
+        height * Math.cos(constrainedAngle);
+    } else {
+      const adjustedAngle = constrainedAngle - Math.PI / 2;
+      nodeWidth =
+        height * Math.cos(adjustedAngle) + width * Math.sin(adjustedAngle);
+      nodeHeight =
+        height * Math.sin(adjustedAngle) + width * Math.cos(adjustedAngle);
+    }
+
+    node.minX = this[DESCRIPTOR].x - nodeWidth / 2;
+    node.maxX = this[DESCRIPTOR].x + nodeHeight / 2;
+    node.minY = this[DESCRIPTOR].y - nodeWidth / 2;
+    node.maxY = this[DESCRIPTOR].y + nodeHeight / 2;
+
+    node.collider = new SAT.Polygon(
+      new SAT.Vector(this[DESCRIPTOR].x, this[DESCRIPTOR].y),
+      [
+        new SAT.Vector(-this[DESCRIPTOR].width / 2, -this[DESCRIPTOR].height / 2),
+        new SAT.Vector(this[DESCRIPTOR].width, 0),
+        new SAT.Vector(0, this[DESCRIPTOR].height),
+        new SAT.Vector(-this[DESCRIPTOR].width, 0),
+      ]
+    );
+
+    node.collider.rotate(radians);
+
+    return node;
+  }
+
+  get width() {
+    return this[DESCRIPTOR].width
+  }
+
+  set width(value) {
+    this[DESCRIPTOR].width = value
+  }
+
+  get height() {
+    return this[DESCRIPTOR].height
+  }
+
+  set height(value) {
+    this[DESCRIPTOR].height = value
+  }
+
+  get url() {
+    return this[DESCRIPTOR].url
+  }
+
+  set url(value) {
+    this[DESCRIPTOR].url = value
+  }
+}
+
+class CircleElement extends AbstractInteractiveElement<'circle'> {
+  constructor(descriptor: Partial<Omit<CircleDescriptor, typeof KIND>>) {
+    super('circle', {
       radius: 0,
       color: "rgb(0,0,0)",
-    };
+      ...descriptor,
+    })
+  }
 
-    const makeNode = (descriptor: CircleDescriptor) => {
-      const { radius, x, y } = descriptor;
-      let node: TreeNode = {} as TreeNode;
+  [MAKE_NODE]() {
+    const { radius, x, y } = this[DESCRIPTOR];
+    let node: TreeNode = {} as TreeNode;
 
-      node.minX = descriptor.x - radius;
-      node.maxX = descriptor.x + radius;
-      node.minY = descriptor.y - radius;
-      node.maxY = descriptor.y + radius;
+    node.minX = this[DESCRIPTOR].x - radius;
+    node.maxX = this[DESCRIPTOR].x + radius;
+    node.minY = this[DESCRIPTOR].y - radius;
+    node.maxY = this[DESCRIPTOR].y + radius;
 
-      node.collider = new SAT.Circle(new SAT.Vector(x, y), radius);
+    node.collider = new SAT.Circle(new SAT.Vector(x, y), radius);
 
-      return node;
-    };
-
-    return InteractiveElement(
-      "circle",
-      {
-        ...defaults,
-        ...props,
-      },
-      {
-        makeNode,
-      }
-    );
+    return node;
   };
 
-  // @ts-ignore
-self.Line =
-    function(props: Omit<LineDescriptor, "kind">) {
-      const defaults: Omit<LineDescriptor, "kind" | keyof ElementDescriptor> = {
-        x1: 0,
-        y1: 0,
-        color: "rgb(0,0,0)",
-        width: 5,
-      };
+  get radius() {
+    return this[DESCRIPTOR].radius
+  }
 
-      const makeNode = (descriptor: LineDescriptor) => {
-        const { width, x, y, x1, y1 } = descriptor;
-        let node: TreeNode = {} as TreeNode;
+  set radius(value) {
+    this[DESCRIPTOR].radius = value
+  }
 
-        node.minX = Math.min(x, x1);
-        node.maxX = Math.max(x, x1);
-        node.minY = Math.min(y, y1);
-        node.maxY = Math.max(y, y1);
+  get color() {
+    return this[DESCRIPTOR].color
+  }
 
-        node.collider = new SAT.Polygon(new SAT.Vector(x, y), [
-          new SAT.Vector(width / 2, y),
-          new SAT.Vector(x1 - x + width / 2, y1),
-          new SAT.Vector(x1 - x - width / 2, y1),
-          new SAT.Vector(-width / 2, y),
-        ]);
+  set color(value) {
+    this[DESCRIPTOR].color = value
+  }
+};
 
-        return node;
-      };
+class LineElement extends AbstractInteractiveElement<"line"> {
+  constructor(descriptor: Partial<Omit<LineDescriptor, typeof KIND>>) {
+    super('line', {
+      x1: 0,
+      y1: 0,
+      color: "rgb(0,0,0)",
+      width: 5,
+      ...descriptor
+    })
+  }
 
-      return InteractiveElement(
-        "line",
-        {
-          ...defaults,
-          ...props,
-        },
-        {
-          makeNode,
-        }
-      );
-    };
+  [MAKE_NODE]() {
+    const { width, x, y, x1, y1 } = this[DESCRIPTOR];
+    let node: TreeNode = {} as TreeNode;
 
-//@ts-ignore
-self.Text = 
-  function(props: Omit<TextDescriptor, "kind"> & {
-    text: string | (() => string)
+    node.minX = Math.min(x, x1);
+    node.maxX = Math.max(x, x1);
+    node.minY = Math.min(y, y1);
+    node.maxY = Math.max(y, y1);
+
+    node.collider = new SAT.Polygon(new SAT.Vector(x, y), [
+      new SAT.Vector(width / 2, y),
+      new SAT.Vector(x1 - x + width / 2, y1),
+      new SAT.Vector(x1 - x - width / 2, y1),
+      new SAT.Vector(-width / 2, y),
+    ]);
+
+    return node;
+  };
+
+  get color() {
+    return this[DESCRIPTOR].color
+  }
+
+  set color(value) {
+    this[DESCRIPTOR].color = value
+  }
+
+  get width() {
+    return this[DESCRIPTOR].width
+  }
+
+  set width(value) {
+    this[DESCRIPTOR].width = value
+  }
+
+  get x1() {
+    return this[DESCRIPTOR].x1
+  }
+
+  set x1(value) {
+    this[DESCRIPTOR].x1 = value
+  }
+
+  get y1() {
+    return this[DESCRIPTOR].y1
+  }
+
+  set y1(value) {
+    this[DESCRIPTOR].y1 = value
+  }
+};
+
+class TextElement extends AbstractInteractiveElement<"text"> {
+  [REMOVE_TICK] = addTick(() => {
+    if (this.textFn) {
+      this[DESCRIPTOR].text = this.textFn()
+    }
+  }, 3)
+  textFn: (() => string) | null = null
+  constructor(descriptor: Partial<Omit<TextDescriptor, typeof KIND>> | {
+    text?: () => string
   }) {
-    const defaults: Omit<TextDescriptor, "kind" | keyof ElementDescriptor> = {
+    super('text', {
       size: 10,
       fontFamily: "sans-serif",
       color: "rgb(0,0,0)",
-      text: "",
       textAlign: "center",
-    };
-
-    const makeNode = (descriptor: TextDescriptor) => {
-      const { x, y, text, size, fontFamily, textAlign } = descriptor;
-      let node: TreeNode = {} as TreeNode;
-
-      textContext.font = size + "px " + fontFamily;
-      textContext.textAlign = textAlign;
-
-      const { width }= textContext?.measureText(text);
-
-      node.collider = new SAT.Polygon(new SAT.Vector(x, y), [
-        new SAT.Vector(width / 2, -size / 2),
-        new SAT.Vector(width / 2, size / 2),
-        new SAT.Vector(-width / 2, size / 2),
-        new SAT.Vector(-width / 2, -size / 2),
-      ]);
-
-      return node;
-    };
-
-    let textFn: (() => string) | null = null
-
-    const removeTextFnTick = addTick(() => {
-      if (textFn) {
-        proxy[INTERNAL].descriptor.text = textFn()
-      }
+      ...descriptor,
+      text: typeof descriptor.text === 'function' ? descriptor.text() : ''
     })
 
-    const proxy = InteractiveElement(
-      "text",
-      {
-        ...defaults,
-        ...props,
-      },
-      {
-        makeNode,
-        setters: {
-          text: (target: InteractiveElement<"text">, value: string | (() => string)) => {
-            if (typeof value === 'function') {
-              textFn = value
-            } else {
-              target[INTERNAL].descriptor.text = value
-              textFn = null
-            }
+    this.textFn = typeof descriptor.text === 'function' ? descriptor.text : null
+  }
+
+  [MAKE_NODE]() {
+    const { x, y, text, size, fontFamily, textAlign } = this[DESCRIPTOR];
+    let node: TreeNode = {} as TreeNode;
+
+    textContext.font = size + "px " + fontFamily;
+    textContext.textAlign = textAlign;
+
+    const { width } = textContext?.measureText(text);
+
+    node.collider = new SAT.Polygon(new SAT.Vector(x, y), [
+      new SAT.Vector(width / 2, -size / 2),
+      new SAT.Vector(width / 2, size / 2),
+      new SAT.Vector(-width / 2, size / 2),
+      new SAT.Vector(-width / 2, -size / 2),
+    ]);
+
+    return node;
+  };
+
+  set text(value: (() => string) | string) {
+    if (typeof value === 'function') {
+      this.textFn = value
+      this[DESCRIPTOR].text = this.textFn()
+    } else {
+      this.textFn = null
+      this[DESCRIPTOR].text = value
+    }
+  }
+
+  get text() {
+    return this.textFn || this[DESCRIPTOR].text
+  }
+
+  get size() {
+    return this[DESCRIPTOR].size
+  }
+
+  set size(value) {
+    this[DESCRIPTOR].size = value
+  }
+
+  get color() {
+    return this[DESCRIPTOR].color
+  }
+
+  set color(value) {
+    this[DESCRIPTOR].color = value
+  }
+
+  get fontFamily() {
+    return this[DESCRIPTOR].fontFamily
+  }
+
+  set fontFamily(value) {
+    this[DESCRIPTOR].fontFamily = value
+  }
+
+  get textAlign() {
+    return this[DESCRIPTOR].textAlign
+  }
+
+  set textAlign(value) {
+    this[DESCRIPTOR].textAlign = value
+  }
+};
+
+class GroupElement<Properties> extends AbstractInteractiveElement<'group'> {
+  [REMOVE_TICK]: () => void;
+  [SHOULD_RENDER] = true;
+  [RENDER] = (properties: Properties) => { };
+
+  [ID] = getId();
+
+  [CHILDREN]: number[] = [];
+
+  // @ts-ignore
+  static create<Properties>(render: typeof GroupElement.prototype[typeof RENDER]) {
+    return function (descriptor: Omit<Properties, typeof KIND>) {
+      return new GroupElement<Properties>({
+        ...descriptor,
+      }, render);
+    }
+  }
+
+  constructor(descriptor: Omit<Properties, typeof KIND>, render: (properties: Properties) => void) {
+    // @ts-expect-error
+    super({
+      ...descriptor,
+      [KIND]: 'group',
+    })
+
+    this[RENDER] = render
+
+    this[REMOVE_TICK] = addTick(() => {
+      if (this[SHOULD_RENDER]) {
+        const unset = setRenderingGroup(this)
+        this[RENDER](this[DESCRIPTOR])
+        this[SHOULD_RENDER] = false
+        unset()
+      }
+    }, 2)
+
+    const propertyKeys = Object.keys(descriptor) as (keyof Properties)[]
+
+    Object.defineProperties(this, propertyKeys.reduce((acc, key) => {
+      if (!this.hasOwnProperty(key)) {
+        acc[key] = {
+          get: () => {
+            return this[DESCRIPTOR][key]
+          },
+          set: (value) => {
+            this[DESCRIPTOR][key] = value
+            this[SHOULD_RENDER] = true
           }
         }
       }
-    );
 
-    return proxy
+      return acc;
+    }, {} as Record<keyof Properties, PropertyDescriptor>)
+    )
+
+    Object.freeze(this)
+
+    if (!renderingGroup === null) {
+      // @ts-expect-error
+      renderingGroup._children.push(this[ID])
+    }
+  }
+
+  [MAKE_NODE]() {
+    return null;
+  }
+
+  delete(): void {
+    for (const id of this[CHILDREN]) {
+      registeredElements.get(id)?.delete()
+    }
+    super.delete()
+    this[REMOVE_TICK]()
+  }
+  touching(element: AbstractInteractiveElement) {
+    if (element[NODE] === null) return false
+    return this[CHILDREN].some((id) => {
+      registeredElements.get(id)?.touching(element)
+    })
   };
+  touchingElements(): AbstractInteractiveElement[] {
+    if (this[NODE] === null) return [];
+    return this[CHILDREN]
+      .map((id) => registeredElements.get(id))
+      .filter((element) => element && !element.deleted)
+      .reduce((acc, element) => [...acc, ...element!.touchingElements()], [] as AbstractInteractiveElement[])
+  };
+  collideWith(element: AbstractInteractiveElement) { };
+  distanceTo(other: AbstractInteractiveElement) {
+    return Math.sqrt(
+      (other.x - this.x) * (other.x - this.x) +
+      (other.y - this.y) * (other.y - this.y)
+    );
+  };
+}
+
+declare global {
+  interface WorkerGlobalScope {
+    Image: typeof ImageElement
+    Circle: typeof CircleElement
+    Line: typeof LineElement
+    Text: typeof TextElement
+    Group: typeof GroupElement
+  }
+}
+
+self.Image = ImageElement
+self.Circle = CircleElement
+self.Line = LineElement
+self.Text = TextElement
+self.Group = GroupElement

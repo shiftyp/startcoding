@@ -26,67 +26,15 @@ import AccordionDetails from "@mui/joy/AccordionDetails";
 import Divider from "@mui/joy/Divider";
 import Select from "@mui/joy/Select";
 import Option from "@mui/joy/Option";
+// @ts-ignore
 import logoUrl from "../images/logowhite.png";
+import Slider from "@mui/joy/Slider";
+import Chip from "@mui/joy/Chip";
+import Input from "@mui/joy/Input";
+import FormLabel from "@mui/joy/FormLabel";
+import FormControl from "@mui/joy/FormControl";
 
-const correctionMatrices = {
-  None: [
-    [1, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0],
-    [0, 0, 1, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Protanopia: [
-    [0.567, 0.433, 0, 0, 0],
-    [0.558, 0.442, 0, 0, 0],
-    [0, 0.242, 0.758, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Protanomaly: [
-    [0.817, 0.183, 0, 0, 0],
-    [0.333, 0.667, 0, 0, 0],
-    [0, 0.125, 0.875, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Deuteranopia: [
-    [0.625, 0.375, 0, 0, 0],
-    [0.7, 0.3, 0, 0, 0],
-    [0, 0.3, 0.7, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Deuteranomaly: [
-    [0.8, 0.2, 0, 0, 0],
-    [0.258, 0.742, 0, 0, 0],
-    [0, 0.142, 0.858, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Tritanopia: [
-    [0.95, 0.05, 0, 0, 0],
-    [0, 0.433, 0.567, 0, 0],
-    [0, 0.475, 0.525, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Tritanomaly: [
-    [0.967, 0.033, 0, 0, 0],
-    [0, 0.733, 0.267, 0, 0],
-    [0, 0.183, 0.817, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Achromatopsia: [
-    [0.299, 0.587, 0.114, 0, 0],
-    [0.299, 0.587, 0.114, 0, 0],
-    [0.299, 0.587, 0.114, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-  Achromatomaly: [
-    [0.618, 0.32, 0.062, 0, 0],
-    [0.163, 0.775, 0.062, 0, 0],
-    [0.163, 0.32, 0.516, 0, 0],
-    [0, 0, 0, 1, 0]
-  ],
-};
-
-export const App = () => {
-  const ui = useMemo(() => new firebaseui.auth.AuthUI(getAuth()), []);
+export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
   const [signedIn, setSignedIn] = useState(!!getAuth().currentUser);
   const [currentUser, setCurrentUser] = useState(getAuth().currentUser);
   const [loaded, setLoaded] = useState(false);
@@ -108,7 +56,24 @@ export const App = () => {
 
   const [colorBlindCorrection, setColorBlindCorrection] = useState<
     Parameters<Awaited<ReturnType<typeof renderGame>>["setColorCorrection"]>[0]
-  >("None");
+  >(null);
+  const [paletteUrl, setPaletteUrl] = useState<string | null>(null);
+  const [gameSpeed, setGameSpeed] = useState<number>(100);
+  const [playSpeed, setPlaySpeed] = useState<number>(gameSpeed);
+  const [shouldGeneratePalette, setShouldGeneratePalette] = useState(false);
+  const [hueRotation, setHueRotation] = useState(0);
+  const [contrastPercentage, setContrastPercentage] = useState(100);
+  const [brightnessPercentage, setBrightnessPercentage] = useState(100);
+  const [loginScreen, setLoginScreen] = useState<Element | null>(null);
+  const [pointerRemap, setPointerRemap] = useState<
+    Record<"UP" | "DOWN" | "LEFT" | "RIGHT" | "CLICK", KeyboardEvent["key"]>
+  >(
+    {} as Record<
+      "UP" | "DOWN" | "LEFT" | "RIGHT" | "CLICK",
+      KeyboardEvent["key"]
+    >
+  );
+  const [pointerRemapSensitivity, setPointerRemapSensitivity] = useState(20);
 
   const loadCode = useCallback(async () => {
     await clone(fs, repoId);
@@ -124,8 +89,14 @@ export const App = () => {
     } else {
       throw "No valid index in repo";
     }
-
-    setCode(new TextDecoder().decode(file));
+    const newCode = new TextDecoder().decode(file);
+    setCode(newCode);
+    setGame(
+      await renderGame({
+        language: "javascript",
+        container: gameRoot.current!,
+      })
+    );
   }, []);
 
   useEffect(() => {
@@ -135,8 +106,22 @@ export const App = () => {
   }, [signedIn]);
 
   useEffect(() => {
-    if (!signedIn) {
-      ui.start("#firebaseui-auth-container", {
+    game?.onUpdatePalette((url) => {
+      setPaletteUrl(url);
+    });
+  }, [game]);
+
+  useEffect(() => {
+    return () => {
+      if (paletteUrl) {
+        URL.revokeObjectURL(paletteUrl);
+      }
+    };
+  }, [paletteUrl]);
+
+  useEffect(() => {
+    if (!signedIn && loginScreen) {
+      authUI.start("#firebaseui-auth-container", {
         callbacks: {
           signInSuccessWithAuthResult: () => {
             setCurrentUser(getAuth().currentUser);
@@ -154,7 +139,7 @@ export const App = () => {
     } else {
       setSignedIn(true);
     }
-  }, []);
+  }, [loginScreen]);
 
   useEffect(() => {
     if (resizing) {
@@ -176,6 +161,14 @@ export const App = () => {
     }
   }, [resizing]);
 
+  useEffect(() => {
+    game?.setGameSpeed(gameSpeed);
+  }, [gameSpeed]);
+
+  useEffect(() => {
+    game?.setGeneratePalette(shouldGeneratePalette);
+  }, [shouldGeneratePalette]);
+
   const gameRoot = useRef<HTMLElement>(null);
 
   const documentation = (
@@ -194,39 +187,210 @@ export const App = () => {
   );
 
   useEffect(() => {
-    if (colorBlindCorrection !== "None") {
-      game?.setColorCorrection(colorBlindCorrection);
-    }
+    game?.setColorCorrection(colorBlindCorrection);
   }, [colorBlindCorrection]);
 
+  useEffect(() => {
+    game?.setPointerRemap(pointerRemap, pointerRemapSensitivity);
+  }, [pointerRemap, pointerRemapSensitivity]);
+
+  const gameFilter = `hue-rotate(${hueRotation}deg) contrast(${contrastPercentage}%) brightness(${brightnessPercentage}%)`;
+
   const accessibility = (
-    <div>
+    <div
+      style={{
+        overflow: "auto",
+        maxHeight: "100%",
+      }}
+    >
       <AccordionGroup variant="outlined">
         <Accordion>
-          <AccordionSummary>Color Filtering</AccordionSummary>
+          <AccordionSummary>Control and Speed Adjustments</AccordionSummary>
           <AccordionDetails>
-            <div className="colorSlider">
+            <h4>Game Speed</h4>
+            <Stack
+              direction={"row"}
+              spacing={2}
+              justifyContent={"center"}
+              alignItems={"center"}
+            >
+              <i className="fi fi-rr-rabbit-fast"></i>
+              <Slider
+                tabIndex={1}
+                valueLabelDisplay={"on"}
+                aria-labelledby="speed-label"
+                min={5}
+                max={100}
+                step={5}
+                value={playSpeed}
+                onChange={(_, value) => {
+                  if (gameSpeed > 0) {
+                    setGameSpeed(value as number);
+                  }
+                  setPlaySpeed(value as number);
+                }}
+              />
+              <i className="fi fi-rr-turtle"></i>
+            </Stack>
+            <h4>Use Keyboard as Pointer Device</h4>
+            <h5>Map Keys to Pointer Events</h5>
+            <FormControl>
+              <FormLabel>Up</FormLabel>
+              <Input
+                value={pointerRemap.UP}
+                placeholder="Up"
+                onKeyUp={(event) => {
+                  setPointerRemap({ ...pointerRemap, UP: event.key });
+                }}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Down</FormLabel>
+              <Input
+                value={pointerRemap.DOWN}
+                placeholder="Down"
+                onKeyUp={(event) => {
+                  setPointerRemap({ ...pointerRemap, DOWN: event.key });
+                }}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Left</FormLabel>
+              <Input
+                value={pointerRemap.LEFT}
+                placeholder="Left"
+                onKeyUp={(event) => {
+                  setPointerRemap({ ...pointerRemap, LEFT: event.key });
+                }}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Right</FormLabel>
+              <Input
+                placeholder="Right"
+                value={pointerRemap.RIGHT}
+                onKeyUp={(event) => {
+                  setPointerRemap({ ...pointerRemap, RIGHT: event.key });
+                }}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Click</FormLabel>
+              <Input
+                value={pointerRemap.CLICK}
+                placeholder="Click"
+                onKeyUp={(event) => {
+                  setPointerRemap({ ...pointerRemap, CLICK: event.key });
+                }}
+              />
+            </FormControl>
+            <h5>Pointer Sensitivity</h5>
+            <Slider
+              tabIndex={1}
+              valueLabelDisplay={"on"}
+              min={1}
+              max={50}
+              step={1}
+              value={pointerRemapSensitivity}
+              onChange={(_, value) => {
+                setPointerRemapSensitivity(value as number);
+              }}
+            />
+          </AccordionDetails>
+        </Accordion>
+        <Accordion
+          onChange={(_, expanded) => {
+            setShouldGeneratePalette(expanded);
+          }}
+        >
+          <AccordionSummary>Color Adjustments</AccordionSummary>
+          <AccordionDetails>
+            <Stack
+              direction={"column"}
+              spacing={2}
+              sx={{
+                paddingTop: "2.5rem",
+              }}
+            >
+              <h4>Game Palette</h4>
               <Stack
-                direction={"column"}
-                spacing={2}
-                sx={{
-                  paddingTop: "2.5rem",
+                sx={{ height: 40, overflow: "hidden" }}
+                alignItems={"center"}
+              >
+                {paletteUrl ? (
+                  <img
+                    src={paletteUrl}
+                    alt="Current Game Palette"
+                    style={{
+                      filter: gameFilter,
+                    }}
+                  />
+                ) : null}
+              </Stack>
+              <h4>Color Replacement</h4>
+              <Select
+                aria-label="Color Replacement Selection"
+                value={colorBlindCorrection ? colorBlindCorrection : "none"}
+                onChange={(_, value) => {
+                  setColorBlindCorrection(
+                    (value === "none" ? null : value) as Parameters<
+                      typeof setColorBlindCorrection
+                    >[0]
+                  );
                 }}
               >
-                <Select
-                  value={colorBlindCorrection}
+                {[
+                  ["none", "none"],
+                  ["protanope", "less red"],
+                  ["deuteranope", "less green"],
+                  ["tritanope", "less blue"],
+                ].map(([correction, label]) => {
+                  return <Option value={correction}>{label}</Option>;
+                })}
+              </Select>
+              <h4>Color Shift</h4>
+              <div className="colorSlider">
+                <Slider
+                  valueLabelDisplay={"on"}
+                  aria-label="Hue Selection"
+                  min={0}
+                  max={360}
+                  step={1}
+                  value={hueRotation}
                   onChange={(_, value) => {
-                    setColorBlindCorrection(
-                      value as Parameters<typeof setColorBlindCorrection>[0]
-                    );
+                    setHueRotation(value as number);
                   }}
-                >
-                  {Object.keys(correctionMatrices).map((correction) => {
-                    return <Option value={correction}>{correction}</Option>;
-                  })}
-                </Select>
-              </Stack>
-            </div>
+                />
+              </div>
+              <h4>Contrast Shift</h4>
+              <div className="contrastSlider">
+                <Slider
+                  valueLabelDisplay={"on"}
+                  aria-label="Contrast Selection"
+                  min={50}
+                  max={200}
+                  step={10}
+                  value={contrastPercentage}
+                  onChange={(_, value) => {
+                    setContrastPercentage(value as number);
+                  }}
+                />
+              </div>
+              <h4>Brightness Shift</h4>
+              <div className="Brightness">
+                <Slider
+                  valueLabelDisplay={"on"}
+                  aria-label="Brightness Selection"
+                  min={50}
+                  max={200}
+                  step={10}
+                  value={brightnessPercentage}
+                  onChange={(_, value) => {
+                    setBrightnessPercentage(value as number);
+                  }}
+                />
+              </div>
+            </Stack>
           </AccordionDetails>
         </Accordion>
       </AccordionGroup>
@@ -246,7 +410,7 @@ export const App = () => {
       ></svg>
       <Modal open={!signedIn}>
         <ModalDialog>
-          <div id="firebaseui-auth-container"></div>
+          <div ref={setLoginScreen} id="firebaseui-auth-container"></div>
         </ModalDialog>
       </Modal>
       <Skeleton loading={!signedIn && code !== null}>
@@ -332,6 +496,7 @@ export const App = () => {
                     style={{
                       visibility: resizing ? "hidden" : "visible",
                       border: "none",
+                      filter: gameFilter,
                     }}
                   ></iframe>
                 </section>
@@ -345,19 +510,31 @@ export const App = () => {
                 }}
               >
                 <Button
+                  disabled={code === null}
                   onClick={async () => {
-                    const game = await renderGame({
-                      language: "javascript",
-                      container: gameRoot.current!,
-                    });
-                    await game.reload(code);
+                    await game?.reload(code!);
                     setLoaded(true);
                     setGame(game);
                   }}
                 >
+                  Start
+                </Button>
+                <Button
+                  disabled={gameSpeed !== 0 || !loaded}
+                  onClick={async () => {
+                    setGameSpeed(playSpeed);
+                  }}
+                >
                   Play
                 </Button>
-                <Button>Pause</Button>
+                <Button
+                  disabled={gameSpeed === 0 || !loaded}
+                  onClick={() => {
+                    setGameSpeed(0);
+                  }}
+                >
+                  Pause
+                </Button>
               </Stack>
             </Stack>
             <Divider
@@ -445,8 +622,8 @@ export const App = () => {
                 <Button
                   disabled={!loaded}
                   onClick={async () => {
-                    await commit(fs, "javascript", code, repoId);
-                    if (game) await game.reload(code);
+                    await commit(fs, "javascript", code!, repoId);
+                    if (game) await game.reload(code!);
                   }}
                 >
                   Save
