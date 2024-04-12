@@ -104,7 +104,7 @@ export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
     if (signedIn) {
       loadCode();
     }
-  }, [signedIn]);
+  }, []);
 
   useEffect(() => {
     game?.onUpdatePalette((url) => {
