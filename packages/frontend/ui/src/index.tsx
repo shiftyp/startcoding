@@ -21,12 +21,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-const authUI = new firebaseui.auth.AuthUI(getAuth())
-
 navigator.serviceWorker.register("/service-worker.js");
 
 const main = () => {
   const root = createRoot(document.getElementById('container')!)
-  root.render(<Main authUI={authUI} />)
+  root.render(<Main />)
 };
 main();

@@ -35,7 +35,7 @@ import FormLabel from "@mui/joy/FormLabel";
 import FormControl from "@mui/joy/FormControl";
 import StyledFirebaseAuth from "react-firebaseui/StyledFirebaseAuth"
 
-export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
+export const App = () => {
   const [signedIn, setSignedIn] = useState(!!getAuth().currentUser);
   const [currentUser, setCurrentUser] = useState(getAuth().currentUser);
   const [loaded, setLoaded] = useState(false);
@@ -101,7 +101,7 @@ export const App = ({ authUI }: { authUI: firebaseui.auth.AuthUI }) => {
   }, []);
 
   useEffect(() => {
-      loadCode();
+    loadCode();
   }, []);
 
   useEffect(() => {
