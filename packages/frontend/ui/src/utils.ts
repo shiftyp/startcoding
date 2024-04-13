@@ -141,7 +141,7 @@ export const clone = async (fs, repo: string) => {
     ref: "main"
   });
 
-  const { displayName, email } = getAuth().currentUser!;
+  const { displayName, email } = getAuth().currentUser || { displayName: null, email: null };
   await config(fs, displayName || "Anonymous", email || "Anonymous");
 
   if (!(await testFile(fs, 'js'))) {
