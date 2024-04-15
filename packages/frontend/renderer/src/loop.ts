@@ -114,7 +114,8 @@ export const game = async ({
 
   renderWorker.onmessage = async (
     message: MessageEvent<
-      [action: "renderSprites", data: Array<[index: number, frame: ImageBitmap]>, tick: Tick]
+      [action: "renderSprites", data: Array<[index: number, frame: ImageBitmap]>, tick: Tick] |
+      [action: "renderError", error: string]
     >
   ) => {
     const [action] = message.data;
@@ -126,6 +127,9 @@ export const game = async ({
       rendering = false;
       lastRenderedTick = tick;
       frames = data
+    } else if (action === 'renderError') {
+      console.debug(message.data[0])
+      rendering = false
     }
   };
 
@@ -294,7 +298,7 @@ export const game = async ({
   };
 
   const resizeLoop = () => {
-    const box = renderFrame.getBoundingClientRect();
+    const box = container.getBoundingClientRect();
 
     if (
       stageContext.width !== box.width ||
@@ -348,8 +352,6 @@ export const game = async ({
     }
   };
 
-  setInterval(gameLoop, 1);
-
   const update = (changes: ArrayBuffer, tick: Tick) => {
     tick.timing.deltaCompute = performance.now() - tick.timing.absTime;
     if (!rendering) {
@@ -368,7 +370,7 @@ export const game = async ({
     stageContext.backgroundLayer.style.backgroundRepeat = "no-repeat";
   };
 
-  const { callTick, reload, trigger } = await createVM({ language, update, updateBackdrop });
+  const { callTick, reload, trigger, setOnError } = await createVM({ language, update, updateBackdrop });
 
   const renderDOMLayers = (domLayers: Set<[index: number, element: HTMLElement]>) => {
     const renderBody = renderFrame.contentDocument!.body
@@ -389,8 +391,7 @@ export const game = async ({
   renderFrame.contentDocument!.addEventListener("mouseleave", onmouseleave);
   renderFrame.contentDocument!.addEventListener("keydown", onkeydown);
   renderFrame.contentDocument!.addEventListener("keyup", onkeyup);
-
-  setTimeout(gameLoop, 1000 / 60);
+  
   renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
 
   renderFrame.style.visibility = "visible";
@@ -429,12 +430,18 @@ export const game = async ({
     }
   })
 
+  let loopInterval: ReturnType<typeof setInterval> | null = null
+
   return {
     reload: async (code: string) => {
+      if (loopInterval) clearInterval(loopInterval)
+      gameLoop()
+      await reload(code);
       computing = false;
-      reload(code);
+      loopInterval = setInterval(gameLoop, 1);
       shouldGeneratePaletteImmediately = true
     },
+    setOnError,
     setColorCorrection: (correction: ColorMode | null) => {
       colorMode = correction
       shouldGeneratePaletteImmediately = true

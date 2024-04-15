@@ -29,7 +29,8 @@
     "@emotion/styled": "11.11.5",
     "@flaticon/flaticon-uicons": "3.1.0",
     "daltonize": "1.0.2",
-    "react-firebaseui": "6.0.0"
+    "react-firebaseui": "6.0.0",
+    "react-markdown": "9.0.1"
   },
   "devDependencies": {
     "typescript": "5.2.2",

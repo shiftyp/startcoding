@@ -1,6 +1,5 @@
 import * as git from "isomorphic-git";
 import { v1 as UUID } from "uuid";
-import { IncomingMessage, OutgoingMessage } from "http";
 // @ts-ignore
 import backend from "git-http-backend";
 import zlib from "zlib";
@@ -29,7 +28,7 @@ const uploadRepo = async (id: string, uuid: string) => {
   });
 };
 
-const syncRepository = async (id: string) => {
+const syncRepository = async (id: string): Promise<string> => {
   const bucket = new Storage().bucket("gs://woofjs2-repos");
   const uuid = UUID();
   const root = path.join(os.tmpdir(), uuid);
@@ -54,12 +53,24 @@ const syncRepository = async (id: string) => {
       file: archive,
       C: root,
     });
-  } else {
-    await git.init({ fs, dir: root, defaultBranch: "main", bare: true });
-    await uploadRepo(id, uuid);
-  }
 
-  return uuid;
+    return uuid
+  } else {
+    await git.init({ fs, dir: root, defaultBranch: "main" });
+    await pfs.writeFile(path.join(root, "README.md"), '🐕 Woof, World! 🚀\n');
+    await pfs.writeFile(path.join(root, "index.js"), '// 🐕 Start Coding Here!!! 🚀\n');
+    await git.add({ fs, dir: root, filepath: "."})
+    await git.commit({ fs, dir: root, message: "Initial commit 🐕" ,author: {
+      name: "Lulu",
+      email: "lulu@woofjs.com"
+    } });
+    
+    await pfs.appendFile(path.join(root, '.git', 'config'), '        bare = true')
+
+    await uploadRepo(id, path.join(uuid, '.git'));
+
+    return await syncRepository(id)
+  }
 };
 
 const proxy = (
@@ -85,16 +96,16 @@ const proxy = (
         return;
       }
 
-      stream.write(JSON.stringify({ "content-type": service.type }));
-
-      const ps = spawn(service.cmd, service.args.concat([dir]), {
-        env: {
-          REMOTE_USER,
-          REMOTE_EMAIL,
-          GIT_URL: translatedUrl?.slice(0, translatedUrl.indexOf(uuid)) + uuid,
-        },
+      stream.write(JSON.stringify({ "content-type": service.type }), () => {
+        const ps = spawn(service.cmd, service.args.concat([dir]), {
+          env: {
+            REMOTE_USER,
+            REMOTE_EMAIL,
+            GIT_URL: translatedUrl?.slice(0, translatedUrl.indexOf(uuid)) + uuid,
+          },
+        });
+        ps.stdout.pipe(service.createStream()).pipe(ps.stdin);
       });
-      ps.stdout.pipe(service.createStream()).pipe(ps.stdin);
     })
   );
 

@@ -15,6 +15,10 @@ import {
   ChangeSet
 } from "@startcoding/types";
 
+import { ZodError, z } from 'zod'
+
+import StackTrace from 'stacktrace-js'
+
 import SAT from "sat";
 import RBush from "rbush";
 
@@ -26,6 +30,29 @@ declare const mouseX: number;
 declare const mouseY: number;
 declare const mousedown: boolean;
 
+const zd = (zod: z.Schema) => (value: any, { kind }: DecoratorContext) => {
+  if ((kind === 'method' || kind === 'setter') && zod instanceof z.ZodFunction) {
+    return zod.implement(value)
+  }
+}
+
+const recursiveMessages = (obj: {
+  // @ts-expect-error
+  _errors: string[],
+  [key: Exclude<string, '_errors'>] : {
+    _errors: string[]
+  }
+}, prefix: string | null = null): string[] => {
+  return Object.keys(obj).reduce((acc, key) => {
+    if (key === '_errors') {
+      return [...acc, ...obj._errors.map(error => prefix !== null ? `Issue with ${prefix}: ${error}` : error)]
+    } else {
+      // @ts-expect-error
+      return [...acc, ...recursiveMessages(obj[key], prefix !== null ? `${prefix}.${key}` : key)]
+    }
+  },[] as string[])
+}
+
 const DESCRIPTOR = Symbol("descriptor");
 const NODE = Symbol("node");
 const NODE_PRIVATE = Symbol("nodePrivate");
@@ -36,6 +63,8 @@ const REMOVE_TICK = Symbol("removeTick");
 const CHILDREN = Symbol("children");
 const PARENT = Symbol("parent");
 const RENDER = Symbol("render");
+
+let scriptURL = ''
 
 const textCanvas = new OffscreenCanvas(0, 0);
 const textContext = textCanvas.getContext("2d")!;
@@ -51,9 +80,6 @@ const backdropDescriptor = {
   url: "",
   style: "cover",
 };
-
-let shouldExecute = false
-let scriptUrl = ''
 
 const difference = <T>(setA: Set<T>, setB: Set<T>): Set<T> => {
   if (Set.prototype.hasOwnProperty('difference')) {
@@ -101,8 +127,15 @@ onmessage = async (
     callTick(tick);
   } else if (action === 'start') {
     const [_, url] = message.data
-    shouldExecute = true
-    scriptUrl = url
+
+    try {
+      await execute(url)
+    } catch (e: any) {
+      postMessage(['loadError', e.toString()])
+      return
+    }
+
+    postMessage(['loaded'])
   }
 };
 
@@ -304,6 +337,7 @@ const execute = async (url: string) => {
     tick.events.forEach(trigger);
   }, 0);
 
+  scriptURL = url
   await import(url)
 }
 
@@ -313,11 +347,6 @@ const callTick = async (tick: Tick) => {
     self[key] = tick.globals[key];
   }
 
-  if (shouldExecute) {
-    shouldExecute = false
-    await execute(scriptUrl)
-  }
-
   textCanvas.height = tick.globals.height;
   textCanvas.width = tick.globals.width;
 
@@ -325,8 +354,32 @@ const callTick = async (tick: Tick) => {
     return priorityA - priorityB
   })
 
-  tickCallbackArray.forEach(([_, callbacks]) => {
-    callbacks.forEach(callback => callback(tick));
+  tickCallbackArray.forEach(async ([_, callbacks]) => {
+    try {
+      callbacks.forEach(callback => callback(tick));
+    } catch(e: any) {
+      if (e instanceof Error) {
+        let messages = [e.message]
+
+        if (e instanceof ZodError) {
+          const formatted = e.format()
+          // @ts-expect-error
+          messages = recursiveMessages(formatted)
+        }
+
+        const stack = await StackTrace.fromError(e)
+
+        const firstTrace = stack.find(trace => {
+          return trace.fileName === scriptURL
+        })!
+
+        postMessage(['tickError', {
+          line: firstTrace.lineNumber,
+          column: firstTrace.columnNumber,
+          messages
+        }])
+      }
+    }
   });
 
   update(tick);
@@ -355,8 +408,15 @@ self.setBackdropURL = (url: string) => {
   backdropDescriptor.url = url;
 };
 
+export const Every = z.function()
+  .args(
+    z.number().min(0),
+    z.union([z.literal('seconds'), z.literal('milliseconds')]),
+    z.function()
+  )
+
 // @ts-ignore
-self.every = (
+const every = Every.implement((
   duration: number,
   unit: "seconds" | "milliseconds",
   callback: () => void
@@ -381,9 +441,20 @@ self.every = (
       last = 0;
     }
   }, 1);
-};
+});
 
-abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor[typeof KIND], 'backdrop'> = Exclude<ElementDescriptor[typeof KIND], 'backdrop'>> {
+const ElementDescriptorSchema = z.object({
+  x: z.optional(z.number()),
+  y: z.optional(z.number()),
+  angle: z.optional(z.number()),
+  layer: z.optional(z.number().min(0).max(100)),
+  opacity: z.optional(z.number().min(0).max(100)),
+  colorEffect: z.optional(z.number())
+})
+
+abstract class AbstractElement { }
+
+abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor[typeof KIND], 'backdrop'> = Exclude<ElementDescriptor[typeof KIND], 'backdrop'>> extends AbstractElement {
   [ID] = getId();
   [PARENT]: number | null = null;
 
@@ -395,6 +466,8 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
   abstract [MAKE_NODE](): TreeNode | null
 
   constructor(kind: Kind, descriptor: Partial<Omit<ElementDescriptorOfKind<Kind>, typeof KIND>>) {
+    super()
+    ElementDescriptorSchema.parse(descriptor)
     // @ts-ignore
     this[DESCRIPTOR] = {
       x: 0,
@@ -438,6 +511,7 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
     return this[DESCRIPTOR].layer
   }
 
+  @zd(z.function().args(z.number().min(0).max(100)))
   set layer(value) {
     if (!this.deleted) removeFromLayer(this[DESCRIPTOR]);
     this[DESCRIPTOR].layer = value;
@@ -448,6 +522,7 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
     return this[DESCRIPTOR].x
   };
 
+  @zd(z.function().args(z.number()))
   set x(value: number) {
     this[DESCRIPTOR].x = value
     this[RESET_NODE]()
@@ -457,6 +532,7 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
     return this[DESCRIPTOR].y
   };
 
+  @zd(z.function().args(z.number()))
   set y(value) {
     this[DESCRIPTOR].y = value
     this[RESET_NODE]()
@@ -466,6 +542,7 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
     return this[DESCRIPTOR].angle
   };
 
+  @zd(z.function().args(z.number()))
   set angle(value) {
     this[DESCRIPTOR].angle = value
     this[RESET_NODE]()
@@ -483,6 +560,7 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
     return this[DESCRIPTOR].opacity
   };
 
+  @zd(z.function().args(z.number().min(0).max(100)))
   set opacity(value) {
     this[DESCRIPTOR].opacity = Math.round(Math.max(
       0,
@@ -506,9 +584,12 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
   hide() {
     this.hidden = true;
   };
+
   show() {
     this.hidden = false;
   };
+
+  @zd(z.function().args(z.function()))
   onMouseDown(callback: () => void) {
     listenElement(
       {
@@ -521,6 +602,8 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
       }
     );
   };
+
+  @zd(z.function().args(z.function()))
   onMouseUp(callback: () => void) {
     listenElement(
       {
@@ -533,6 +616,8 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
       }
     );
   };
+
+  @zd(z.function().args(z.function()))
   onMouseOver(callback: () => void) {
     listenElement(
       {
@@ -545,6 +630,8 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
       }
     );
   };
+
+  @zd(z.function().args(z.function()))
   onMouseOut(callback: () => void) {
     listenElement(
       {
@@ -557,6 +644,8 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
       }
     );
   };
+
+  @zd(z.function().args(z.function()))
   onMouseMove(callback: () => void) {
     listenElement(
       {
@@ -569,6 +658,10 @@ abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor
       }
     );
   };
+
+  @zd(z.function().args(z.instanceof(AbstractElement, {
+    message: 'Expected a Sprite'
+  })))
   touching(element: AbstractInteractiveElement) {
     if (this[NODE] === null || element[NODE] === null) return false
     const otherCollider = element[NODE].collider;
@@ -673,6 +766,7 @@ class ImageElement extends AbstractInteractiveElement<'image'> {
     return this[DESCRIPTOR].width
   }
 
+  @zd(z.function().args(z.number()))
   set width(value) {
     this[DESCRIPTOR].width = value
   }
@@ -681,6 +775,7 @@ class ImageElement extends AbstractInteractiveElement<'image'> {
     return this[DESCRIPTOR].height
   }
 
+  @zd(z.function().args(z.number()))
   set height(value) {
     this[DESCRIPTOR].height = value
   }
@@ -689,6 +784,7 @@ class ImageElement extends AbstractInteractiveElement<'image'> {
     return this[DESCRIPTOR].url
   }
 
+  @zd(z.function().args(z.string()))
   set url(value) {
     this[DESCRIPTOR].url = value
   }
@@ -721,6 +817,7 @@ class CircleElement extends AbstractInteractiveElement<'circle'> {
     return this[DESCRIPTOR].radius
   }
 
+  @zd(z.function().args(z.number()))
   set radius(value) {
     this[DESCRIPTOR].radius = value
   }
@@ -729,6 +826,7 @@ class CircleElement extends AbstractInteractiveElement<'circle'> {
     return this[DESCRIPTOR].color
   }
 
+  @zd(z.function().args(z.string()))
   set color(value) {
     this[DESCRIPTOR].color = value
   }
@@ -768,6 +866,7 @@ class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].color
   }
 
+  @zd(z.function().args(z.string()))
   set color(value) {
     this[DESCRIPTOR].color = value
   }
@@ -776,6 +875,7 @@ class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].width
   }
 
+  @zd(z.function().args(z.number()))
   set width(value) {
     this[DESCRIPTOR].width = value
   }
@@ -784,6 +884,7 @@ class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].x1
   }
 
+  @zd(z.function().args(z.number()))
   set x1(value) {
     this[DESCRIPTOR].x1 = value
   }
@@ -792,6 +893,7 @@ class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].y1
   }
 
+  @zd(z.function().args(z.number()))
   set y1(value) {
     this[DESCRIPTOR].y1 = value
   }
@@ -838,6 +940,7 @@ class TextElement extends AbstractInteractiveElement<"text"> {
     return node;
   };
 
+  @zd(z.function().args(z.union([z.function().returns(z.string()), z.string()])))
   set text(value: (() => string) | string) {
     if (typeof value === 'function') {
       this.textFn = value
@@ -856,6 +959,7 @@ class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].size
   }
 
+  @zd(z.function().args(z.number()))
   set size(value) {
     this[DESCRIPTOR].size = value
   }
@@ -863,6 +967,8 @@ class TextElement extends AbstractInteractiveElement<"text"> {
   get color() {
     return this[DESCRIPTOR].color
   }
+
+  @zd(z.function().args(z.string()))
 
   set color(value) {
     this[DESCRIPTOR].color = value
@@ -872,6 +978,7 @@ class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].fontFamily
   }
 
+  @zd(z.function().args(z.string()))
   set fontFamily(value) {
     this[DESCRIPTOR].fontFamily = value
   }
@@ -880,6 +987,7 @@ class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].textAlign
   }
 
+  @zd(z.function().args(z.string()))
   set textAlign(value) {
     this[DESCRIPTOR].textAlign = value
   }
@@ -983,6 +1091,7 @@ class GroupElement<Properties> extends AbstractInteractiveElement<'group'> {
 
 declare global {
   interface WorkerGlobalScope {
+    every: typeof every
     Image: typeof ImageElement
     Circle: typeof CircleElement
     Line: typeof LineElement
@@ -991,6 +1100,7 @@ declare global {
   }
 }
 
+self.every = every
 self.Image = ImageElement
 self.Circle = CircleElement
 self.Line = LineElement

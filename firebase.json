@@ -13,12 +13,17 @@
       },
       {
         "source": "/code/**",
-        "run": {
-          "serviceId": "code-service"
-        }
+        "function": "code"
       }
     ]
   },
+  "functions": [
+    {
+      "source": "./functions/code",
+      "codebase": "default",
+      "runtime": "nodejs18"
+    }
+  ],
   "storage": {
     "rules": "storage.rules"
   }

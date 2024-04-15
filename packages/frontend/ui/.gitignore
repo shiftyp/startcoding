@@ -2,4 +2,3 @@ public/assets
 public/index.html
 public/service-worker.js
 yarn-error.log
-.env

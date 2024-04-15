@@ -33,16 +33,22 @@ import Chip from "@mui/joy/Chip";
 import Input from "@mui/joy/Input";
 import FormLabel from "@mui/joy/FormLabel";
 import FormControl from "@mui/joy/FormControl";
-import StyledFirebaseAuth from "react-firebaseui/StyledFirebaseAuth"
+import Tabs from "@mui/joy/Tabs";
+import TabList from "@mui/joy/TabList";
+import Tab from "@mui/joy/Tab";
+import StyledFirebaseAuth from "react-firebaseui/StyledFirebaseAuth";
+import Markdown from "react-markdown";
 
 export const App = () => {
-  const [signedIn, setSignedIn] = useState(!!getAuth().currentUser);
   const [currentUser, setCurrentUser] = useState(getAuth().currentUser);
+  const [signIn, setSignIn] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [editorDrawer, setShowEditorDrawer] = useState<
-    "documentation" | "accessibility" | false
+    "documentation" | "accessibility" | "readme" | false
   >(false);
   const [code, setCode] = useState<string | null>(null);
+  const [readme, setReadme] = useState<string | null>(null);
+  const [file, setFile] = useState<"index.js" | "README.md" | null>(null);
   const [resizing, setResizing] = useState(false);
   const [editorWidth, setEditorWidth] = useState(600);
   const [game, setGame] = useState<Awaited<
@@ -75,23 +81,27 @@ export const App = () => {
     >
   );
   const [pointerRemapSensitivity, setPointerRemapSensitivity] = useState(20);
+  const [error, setError] = useState<{
+    line: number,
+    column: number,
+    messages: string[]
+  } | null>(null)
 
   const loadCode = useCallback(async () => {
     await clone(fs, repoId);
-    let file: Uint8Array;
-    let language: Language;
 
-    if (await testFile(fs, "js")) {
-      language = "javascript";
-      file = (await fs.promises.readFile("/code/index.js")) as Uint8Array;
-    } else if (await testFile(fs, "py")) {
-      language = "python";
-      file = (await fs.promises.readFile("/code/index.py")) as Uint8Array;
-    } else {
-      throw "No valid index in repo";
-    }
-    const newCode = new TextDecoder().decode(file);
+    const codeFile = (await fs.promises.readFile(
+      "/code/index.js"
+    )) as Uint8Array;
+    const readmeFile = (await fs.promises.readFile(
+      "/code/README.md"
+    )) as Uint8Array;
+    const newCode = new TextDecoder().decode(codeFile);
+    const newReadme = new TextDecoder().decode(readmeFile);
+
     setCode(newCode);
+    setReadme(newReadme);
+    setFile("index.js");
     setGame(
       await renderGame({
         language: "javascript",
@@ -104,10 +114,25 @@ export const App = () => {
     loadCode();
   }, []);
 
+  useEffect(() => { 
+    if (error) {
+      setGameSpeed(0)
+    }
+  }, [error])
+
   useEffect(() => {
-    game?.onUpdatePalette((url) => {
-      setPaletteUrl(url);
-    });
+    if (currentUser) {
+      config(
+        fs,
+        currentUser.displayName || currentUser.email!,
+        currentUser.email!
+      );
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    game?.onUpdatePalette(setPaletteUrl);
+    game?.setOnError(setError)
   }, [game]);
 
   useEffect(() => {
@@ -117,12 +142,6 @@ export const App = () => {
       }
     };
   }, [paletteUrl]);
-
-  useEffect(() => {
-    if (!signedIn) {
-      setSignedIn(true);
-    }
-  }, [loginScreen]);
 
   useEffect(() => {
     if (resizing) {
@@ -382,263 +401,314 @@ export const App = () => {
 
   return (
     <>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        xmlnsXlink="http://www.w3.org/1999/xlink"
-        height={0}
-        width={0}
-        style={{
-          display: "none",
+      <Modal
+        open={signIn}
+        onClose={() => {
+          setSignIn(false);
         }}
-      ></svg>
-      <Modal open={!signedIn}>
+      >
         <ModalDialog>
-          <StyledFirebaseAuth uiConfig={{
-            callbacks: {
-              signInSuccessWithAuthResult: () => {
-                setCurrentUser(getAuth().currentUser);
-                setSignedIn(true);
-                return false;
-              },
-            },
-            signInOptions: [
-              {
-                provider: EmailAuthProvider.PROVIDER_ID,
-                requireDisplayName: true,
-              },
-            ],
-          }} firebaseAuth={getAuth()}/>
+          {signIn ? (
+            <StyledFirebaseAuth
+              uiConfig={{
+                callbacks: {
+                  signInSuccessWithAuthResult: () => {
+                    setCurrentUser(getAuth().currentUser);
+                    setSignIn(false);
+                    return false;
+                  },
+                },
+                signInOptions: [
+                  {
+                    provider: EmailAuthProvider.PROVIDER_ID,
+                    requireDisplayName: true,
+                  },
+                ],
+              }}
+              firebaseAuth={getAuth()}
+            />
+          ) : null}
         </ModalDialog>
       </Modal>
-      <Skeleton loading={!signedIn && code !== null}>
-        <Stack
+      <Stack
+        sx={{
+          flexGrow: 1,
+          flexShrink: 1,
+          minHeight: 0,
+          minWidth: 0,
+          height: "100vh",
+        }}
+        direction={"column"}
+      >
+        <Sheet
           sx={{
-            flexGrow: 1,
-            flexShrink: 1,
-            minHeight: 0,
-            minWidth: 0,
-            height: "100vh",
+            backgroundColor: "#6DC0F2",
+            padding: "1em",
+            height: "4.5rem",
           }}
-          direction={"column"}
         >
-          <Sheet
-            sx={{
-              backgroundColor: "#6DC0F2",
-              padding: "1em",
-            }}
-          >
-            <section aria-label="Toolbar">
-              <Grid spacing={2} container>
-                <Grid xs={5} md={5}>
-                  <Stack direction={"row"} alignItems={"flex-start"}>
-                    <Button>{currentUser?.displayName || "Sign In"}</Button>
-                  </Stack>
-                </Grid>
-                <Grid xs={2} md={2}>
-                  <img
-                    style={{
-                      height: "2rem",
-                    }}
-                    src={logoUrl}
-                    alt="Woof JS Logo"
-                  />
-                </Grid>
-                <Grid xs={5} md={5}>
-                  <Stack
-                    spacing={2}
-                    justifyContent="flex-end"
-                    alignItems="center"
-                    direction="row"
-                  >
-                    <Button
-                      tabIndex={1}
-                      startDecorator={
-                        <i className="fi fi-rr-universal-access"></i>
-                      }
-                      onClick={() => {
-                        setShowEditorDrawer(
-                          editorDrawer !== "accessibility"
-                            ? "accessibility"
-                            : false
-                        );
-                      }}
-                    >
-                      Accessibility
-                    </Button>
-                  </Stack>
-                </Grid>
+          <section aria-label="Toolbar">
+            <Grid spacing={2} container>
+              <Grid xs={5} md={5}>
+                <Stack
+                  direction={"row"}
+                  alignItems={"flex-start"}
+                  onClick={() => setSignIn(true)}
+                >
+                  <Button>{currentUser?.displayName || "Sign In"}</Button>
+                </Stack>
               </Grid>
-            </section>
-          </Sheet>
-          <Stack
-            sx={{ flexGrow: 1, flexShrink: 1, minHeight: 0, minWidth: 0 }}
-            direction={"row"}
-          >
-            <Stack
+              <Grid xs={2} md={2}>
+                <img
+                  style={{
+                    height: "2rem",
+                  }}
+                  src={logoUrl}
+                  alt="Woof JS Logo"
+                />
+              </Grid>
+              <Grid xs={5} md={5}>
+                <Stack
+                  spacing={2}
+                  justifyContent="flex-end"
+                  alignItems="center"
+                  direction="row"
+                >
+                  <Button
+                    tabIndex={1}
+                    startDecorator={
+                      <i className="fi fi-rr-universal-access"></i>
+                    }
+                    onClick={() => {
+                      setShowEditorDrawer(
+                        editorDrawer !== "accessibility"
+                          ? "accessibility"
+                          : false
+                      );
+                    }}
+                  >
+                    Accessibility
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+          </section>
+        </Sheet>
+        <Stack
+          sx={{ flexGrow: 1, flexShrink: 1, minHeight: 0, minWidth: 0 }}
+          direction={"row"}
+        >
+          <Stack sx={{ flexGrow: 1, flexShrink: 1, minHeight: 0, minWidth: 0 }}>
+            <Sheet
               sx={{ flexGrow: 1, flexShrink: 1, minHeight: 0, minWidth: 0 }}
             >
-              <Sheet
-                sx={{ flexGrow: 1, flexShrink: 1, minHeight: 0, minWidth: 0 }}
-              >
-                <section
-                  ref={gameRoot}
-                  aria-label="Game"
-                  id="root"
-                  style={{
-                    filter: `url(#colorFilter)`,
-                  }}
-                >
-                  <iframe
-                    id="output"
-                    style={{
-                      visibility: resizing ? "hidden" : "visible",
-                      border: "none",
-                      filter: gameFilter,
-                    }}
-                  ></iframe>
-                </section>
-              </Sheet>
-              <Stack
-                direction={"row"}
-                spacing={2}
+              <section
+                ref={gameRoot}
+                aria-label="Game"
+                id="root"
                 style={{
-                  backgroundColor: "#6DC0F2",
-                  padding: "1em",
+                  filter: `url(#colorFilter)`,
                 }}
               >
-                <Button
-                  disabled={code === null}
-                  onClick={async () => {
-                    await game?.reload(code!);
-                    setLoaded(true);
-                    setGame(game);
+                <iframe
+                  id="output"
+                  style={{
+                    visibility: resizing ? "hidden" : "visible",
+                    border: "none",
+                    filter: gameFilter,
                   }}
-                >
-                  Start
-                </Button>
-                <Button
-                  disabled={gameSpeed !== 0 || !loaded}
-                  onClick={async () => {
-                    setGameSpeed(playSpeed);
-                  }}
-                >
-                  Play
-                </Button>
-                <Button
-                  disabled={gameSpeed === 0 || !loaded}
-                  onClick={() => {
-                    setGameSpeed(0);
-                  }}
-                >
-                  Pause
-                </Button>
-              </Stack>
-            </Stack>
-            <Divider
-              orientation="vertical"
-              sx={{
-                color: "white",
+                ></iframe>
+              </section>
+            </Sheet>
+            <Stack
+              direction={"row"}
+              spacing={2}
+              style={{
                 backgroundColor: "#6DC0F2",
-              }}
-              onMouseDown={() => {
-                setResizing(true);
+                padding: "1em"
               }}
             >
-              <i className="fi fi-rr-grip-dots-vertical"></i>
-            </Divider>
-            <Stack direction="column" height={"100%"}>
-              <Stack
-                direction="row"
-                sx={{
-                  flexGrow: 1,
-                  flexShrink: 1,
-                  minHeight: 0,
-                  minWidth: 0,
+              <Button
+                disabled={code === null}
+                onClick={async () => {
+                  await game?.reload(code!);
+                  setLoaded(true);
+                  setGame(game);
+                  setGameSpeed(playSpeed)
+                  setError(null)
                 }}
               >
-                {editorDrawer ? (
+                Start
+              </Button>
+              <Button
+                disabled={gameSpeed !== 0 || !loaded || !!error}
+                onClick={async () => {
+                  setGameSpeed(playSpeed);
+                }}
+              >
+                Play
+              </Button>
+              <Button
+                disabled={gameSpeed === 0 || !loaded || !!error}
+                onClick={() => {
+                  setGameSpeed(0);
+                }}
+              >
+                Pause
+              </Button>
+            </Stack>
+          </Stack>
+          <Divider
+            orientation="vertical"
+            sx={{
+              color: "white",
+              backgroundColor: "#6DC0F2",
+            }}
+            onMouseDown={() => {
+              setResizing(true);
+            }}
+          >
+            <i className="fi fi-rr-grip-dots-vertical"></i>
+          </Divider>
+          <Stack direction="column" height={"100%"}>
+            <Stack
+              direction="row"
+              sx={{
+                flexGrow: 1,
+                flexShrink: 1,
+                minHeight: 0,
+                minWidth: 0,
+                maxHeight: '100%'
+              }}
+            >
+              {editorDrawer ? (
+                <>
                   <Sheet
                     sx={{
                       width: "500px",
+                      padding: '1.5rem'
                     }}
                   >
-                    {editorDrawer === "documentation"
-                      ? documentation
-                      : accessibility}
+                    {editorDrawer === "documentation" ? (
+                      documentation
+                    ) : editorDrawer === "accessibility" ? (
+                      accessibility
+                    ) : (
+                      <Markdown>{readme}</Markdown>
+                    )}
                   </Sheet>
-                ) : null}
-                <Sheet
-                  sx={{
-                    width: editorWidth,
-                    maxWidth: `calc(100vw - ${
-                      editorDrawer ? "20em - 500px" : "20em"
-                    })`,
-                    minWidth: "20rem",
-                  }}
-                  ref={(el) => {
-                    if (el) {
-                      setInterval(() => {
-                        if (el.offsetWidth !== editorWidth) {
-                          setEditorWidth(el.offsetWidth);
-                        }
-                      }, 1000);
-                    }
-                  }}
-                >
-                  <section
-                    aria-label="Editor"
-                    style={{
-                      height: "100%",
-                      width: "100%",
-                    }}
-                  >
-                    {code !== null ? (
-                      <CodeEditor
-                        height={"100%"}
-                        defaultValue={code}
-                        onChange={(changed) => changed && setCode(changed)}
-                        language="javascript"
-                        options={{
-                          minimap: {
-                            enabled: false,
-                          },
-                        }}
-                      />
-                    ) : null}
-                  </section>
-                </Sheet>
-              </Stack>
+                  <Divider orientation="vertical" />
+                </>
+              ) : null}
               <Stack
-                direction={"row"}
-                spacing={2}
-                style={{
-                  backgroundColor: "#6DC0F2",
-                  padding: "1em",
+                direction="column"
+                sx={{
+                  width: editorWidth,
+                  maxWidth: `calc(100vw - ${
+                    editorDrawer ? "20em - 500px" : "20em"
+                  })`,
+                  minWidth: "20rem",
+                  minHeight: 0,
+                  flexGrow: 1,
+                  flexShrink: 1,
+                }}
+                ref={(el) => {
+                  if (el) {
+                    setInterval(() => {
+                      if (el.offsetWidth !== editorWidth) {
+                        setEditorWidth(el.offsetWidth);
+                      }
+                    }, 1000);
+                  }
                 }}
               >
-                <Button
-                  disabled={!loaded}
-                  onClick={async () => {
-                    await commit(fs, "javascript", code!, repoId);
-                    if (game) await game.reload(code!);
-                  }}
-                >
-                  Save
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowEditorDrawer(
-                      editorDrawer !== "documentation" ? "documentation" : false
-                    );
-                  }}
-                >
-                  Toggle Documentation
-                </Button>
+                {file !== null ? (
+                  <>
+                    <Tabs
+                      aria-label="File Selection"
+                      defaultValue={file}
+                      onChange={(_, value) => {
+                        setFile(value as "index.js" | "README.md");
+                      }}
+                    >
+                      <TabList>
+                        <Tab value={"index.js"}>index.js</Tab>
+                        <Tab value={"README.md"}>README.md</Tab>
+                      </TabList>
+                    </Tabs>
+                      <section
+                        aria-label="Editor"
+                        style={{
+                          width: "100%",
+                          flexGrow: 1,
+                          flexShrink: 1,
+                          maxHeight: 'calc(100% - 1.5rem - 11px)'
+                        }}
+                      >
+                        <CodeEditor
+                          file={file}
+                          code={code}
+                          readme={readme}
+                          error={error}
+                          setError={setError}
+                          setCode={setCode}
+                          setReadme={setReadme}
+                        />
+                        )
+                      </section>
+                  </>
+                ) : null}
               </Stack>
+            </Stack>
+            <Stack
+              direction={"row"}
+              alignItems={"flex-end"}
+              spacing={2}
+              style={{
+                backgroundColor: "#6DC0F2",
+                padding: "1em",
+              }}
+            >
+              <Button
+                disabled={file === null}
+                onClick={async () => {
+                  if (currentUser) {
+                    await commit(
+                      fs,
+                      file!,
+                      file! === "index.js" ? code! : readme!,
+                      repoId
+                    );
+                    if (game) await game.reload(code!);
+                  } else {
+                    setSignIn(true);
+                  }
+                }}
+              >
+                Save
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditorDrawer(
+                    editorDrawer !== "documentation" ? "documentation" : false
+                  );
+                }}
+              >
+                Toggle Documentation
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditorDrawer(
+                    editorDrawer !== "readme" ? "readme" : false
+                  );
+                }}
+              >
+                Toggle Readme
+              </Button>
             </Stack>
           </Stack>
         </Stack>
-      </Skeleton>
+      </Stack>
     </>
   );
 };

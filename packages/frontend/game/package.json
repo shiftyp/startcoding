@@ -2,8 +2,8 @@
   "name": "@startcoding/game",
   "version": "1.0.0",
   "type": "module",
-  "types": "./dist/game.d.ts",
-  "main": "./dist/game.js",
+  "types": "./dist/game_worker.d.ts",
+  "main": "./dist/game_worker.js",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -15,7 +15,9 @@
     "@types/rbush": "3.0.3",
     "@types/sat": "0.0.35",
     "sat": "0.9.0",
-    "rbush": "3.0.1"
+    "rbush": "3.0.1",
+    "zod": "3.22.4",
+    "stacktrace-js": "2.0.2"
   },
   "devDependencies": {
     "typescript": "5.2.2",

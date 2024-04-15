@@ -1,11 +1,11 @@
 import git, { HttpClient } from "isomorphic-git";
 import LightningFS from "@isomorphic-git/lightning-fs";
-import { Language } from "@startcoding/types";
-import asyncify from 'callback-to-async-iterator'
+import asyncify from "callback-to-async-iterator";
 import { getAuth } from "firebase/auth";
 
-const createChunkCallback = (ws: WebSocket) => async (callback: (Uint8Array) => void) => {
-
+const createChunkCallback = (ws: WebSocket) => async (
+  callback: (Uint8Array) => void
+) => {
   const handleChunk = async (evt: MessageEvent) => {
     const buffer = Buffer.from(
       (await (evt.data as Blob).arrayBuffer()) as ArrayBuffer
@@ -14,45 +14,45 @@ const createChunkCallback = (ws: WebSocket) => async (callback: (Uint8Array) => 
   };
 
   ws.onmessage = handleChunk;
-  ws.onclose = () => callback(null)
+  ws.onclose = () => callback(null);
 };
 
 const chunkGenerator = async function*(ws: WebSocket) {
-  const innerGenerator = asyncify(createChunkCallback(ws))
+  const innerGenerator = asyncify(createChunkCallback(ws));
 
-  let next: { value: Uint8Array | null, done: boolean}
+  let next: { value: Uint8Array | null; done: boolean };
 
   do {
-    next = await innerGenerator.next()
-    if (next.value) yield next.value
-  } while (next.value)
-}
+    next = await innerGenerator.next();
+    if (next.value) yield next.value;
+  } while (next.value);
+};
 
 const http: HttpClient = {
   request: async ({ url, method, headers, body }) => {
-    const ws = new WebSocket(`wss://code-service-5yng3ystqq-uc.a.run.app`);
-
-    ws.onopen = async () => {
-      ws.send(
-        JSON.stringify({
-          method,
-          location: url.slice(
-            url.indexOf(location.host) + location.host.length
-          ),
-          ...headers,
-        })
-      );
-      if (body) {
-        const iterator = body as AsyncIterable<Uint8Array>;
-
-        for await (const chunk of iterator) {
-          ws.send(chunk);
-        }
-      }
-    };
-
     return new Promise((resolve, reject) => {
-      ws.onmessage = async (message) => {
+      const ws = new WebSocket(`wss://code-service-5yng3ystqq-uc.a.run.app`);
+
+      ws.onopen = async () => {
+        ws.send(
+          JSON.stringify({
+            method,
+            location: url.slice(
+              url.indexOf(location.host) + location.host.length
+            ),
+            ...headers,
+          })
+        );
+        if (body) {
+          const iterator = body as AsyncIterable<Uint8Array>;
+
+          for await (const chunk of iterator) {
+            ws.send(chunk);
+          }
+        }
+      };
+
+      const onMessage = async (message) => {
         resolve({
           url: url,
           headers: JSON.parse(await message.data.text()) as Record<
@@ -62,8 +62,11 @@ const http: HttpClient = {
           body: chunkGenerator(ws),
           statusCode: 200,
           statusMessage: "Ok",
-        });
-      };
+        })
+        ws.removeEventListener('message', onMessage)
+      }
+
+      ws.addEventListener('message', onMessage);
     });
   },
 };
@@ -137,43 +140,60 @@ export const clone = async (fs, repo: string) => {
     fs,
     http,
     dir,
-    url: repoUrl(repo),
-    ref: "main"
+    url: repoUrl(repo)
   });
 
-  const { displayName, email } = getAuth().currentUser || { displayName: null, email: null };
-  await config(fs, displayName || "Anonymous", email || "Anonymous");
+  const branches = await git.listBranches({
+    fs,
+    dir
+  })
 
-  if (!(await testFile(fs, 'js'))) {
-    await commit(fs, 'javascript', '// Start Coding Here!!!', repo)
+  if (!branches.includes("main")) {
+    git.branch({
+      fs,
+      dir,
+      ref: 'main',
+      checkout: true
+    })
+  } else {
+    await git.checkout({
+      fs,
+      dir,
+      ref: 'main'
+    })
   }
+
+  const { displayName, email } = getAuth().currentUser || {
+    displayName: null,
+    email: null,
+  };
+  await config(fs, displayName || "Anonymous", email || "Anonymous");
 
   return fs;
 };
 
 export const commit = async (
   fs: LightningFS,
-  language: Language,
+  filepath: 'index.js' | 'README.md',
   code: string,
   repo: string
 ) => {
-  const filepath = `index.${language === "javascript" ? "js" : "py"}`;
   const fullPath = `/code/${filepath}`;
-  
-  let currentFile: Uint8Array | string | null
+
+  let currentFile: Uint8Array | string | null;
 
   try {
     currentFile = await fs.promises.readFile(fullPath);
-  } catch(e) {
-    currentFile = null
+  } catch (e) {
+    currentFile = null;
   }
 
-  let currentCode: string | null
+  let currentCode: string | null;
 
   if (currentFile instanceof Uint8Array) {
     currentCode = new TextDecoder().decode(currentFile);
   } else {
-    currentCode = currentFile
+    currentCode = currentFile;
   }
 
   if (currentCode !== code) {
@@ -182,13 +202,14 @@ export const commit = async (
     await git.add({
       fs,
       dir: "/code",
-      filepath: filepath,
+      filepath: filepath
     });
 
     await git.commit({
       fs,
       message: "Save",
       dir: "/code",
+      ref: "main",
     });
 
     await git.push({
@@ -196,6 +217,7 @@ export const commit = async (
       dir: "/code",
       remote: "origin",
       http,
+      ref: "main",
     });
   }
 };

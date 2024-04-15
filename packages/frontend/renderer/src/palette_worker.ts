@@ -29,7 +29,6 @@ onmessage = async (message: MessageEvent<[action: 'generatePalette', tick: Tick,
       quant.sample(imageData.data)
       const paletteArray = quant.palette(false, false)
       const paletteData = new ImageData(16, paletteArray.length / 16)
-      console.log(paletteData.data.toString().slice(0,8))
       var buffer = new Uint8Array(paletteData.data.buffer);
       buffer.set(paletteArray);
       paletteCanvas.width = paletteData.width

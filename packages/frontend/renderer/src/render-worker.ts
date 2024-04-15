@@ -79,8 +79,15 @@ const render = async (changes: ChangeSet, tick: Tick) => {
   }
 
   
+  let frame: ImageBitmap
 
-  const frame = spriteCanvas.transferToImageBitmap()
+  try {
+    frame = spriteCanvas.transferToImageBitmap()
+  } catch(e: any) {
+    postMessage(["renderError", e.toString()])
+    return
+  }
+
   layerFrames.push([0, frame])
   frames.push(frame)
 

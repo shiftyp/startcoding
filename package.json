@@ -12,7 +12,7 @@
     "./packages/frontend/editor",
     "./packages/frontend/compiler",
     "./packages/frontend/ui",
-    "./services/code"
+    "./functions/code"
   ],
   "private": true
 }
