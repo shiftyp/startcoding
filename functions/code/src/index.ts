@@ -1,26 +1,36 @@
 import * as functionsV2 from "firebase-functions/v2";
-import {WebSocketServer, createWebSocketStream} from "ws";
+import {WebSocketServer, createWebSocketStream, WebSocket, RawData} from "ws";
 
 import {Server} from 'http'
-import stream from 'stream'
 import { handler } from "./code_handler.js";
 
 let server: Server; // http.Server
 const wss = new WebSocketServer({noServer: true});
 
-wss.on('connection', ws => {
-  let stream: stream.Duplex | null = null
+const handleHandshake = (ws: WebSocket) => {
   let headers: Headers | null = null
 
-  ws.on('error', console.error)
-  ws.on('message', (data, isBinary) => {
+  const messageHandler = (data: RawData, isBinary: boolean) => {
     if (!isBinary) {
-      headers = new Headers(JSON.parse(data as unknown as string))
-      stream = createWebSocketStream(ws)
+      const parsed = JSON.parse((data as unknown) as string);
+      if (parsed.sendHeaders) {
+        console.log('sendHeaders recieved')
+        const stream = createWebSocketStream(ws);
 
-      handler(headers, stream)
+        handler(headers!, stream);
+        ws.off("message", messageHandler);
+      } else {
+        console.log('Headers recieved')
+        headers = new Headers(parsed)
+      }
     }
-  })
+  };
+  ws.on("message", messageHandler);
+};
+
+wss.on('connection', ws => {
+  ws.on('error', console.error)
+  handleHandshake(ws)
 })
 
 export const code = functionsV2.https.onRequest(
@@ -39,4 +49,5 @@ export const code = functionsV2.https.onRequest(
 
     // server.emit("request", req, res); // this is not sufficient
     res.setHeader("Retry-After", 0).status(503).send("Websockets now ready");
+    res.send()
   });

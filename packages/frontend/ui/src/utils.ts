@@ -28,29 +28,23 @@ const chunkGenerator = async function*(ws: WebSocket) {
   } while (next.value);
 };
 
+let retryCount = 0
+const maxRetries = 10
+
 const http: HttpClient = {
   request: async ({ url, method, headers, body }) => {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`wss://code-service-5yng3ystqq-uc.a.run.app`);
+      const ws = new WebSocket(`wss://${import.meta.env.VITE_FIREBASE_CODE_FUNCTION}`);
 
-      ws.onopen = async () => {
-        ws.send(
-          JSON.stringify({
-            method,
-            location: url.slice(
-              url.indexOf(location.host) + location.host.length
-            ),
-            ...headers,
-          })
-        );
-        if (body) {
-          const iterator = body as AsyncIterable<Uint8Array>;
-
-          for await (const chunk of iterator) {
-            ws.send(chunk);
-          }
+      ws.addEventListener('error', (err: Event) => {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`Retrying connection attempt ${retryCount}...`);
+          http.request({ url, method, headers, body});
+        } else {
+          console.error('websockets error:', err);
         }
-      };
+      })
 
       const onMessage = async (message) => {
         resolve({
@@ -66,8 +60,30 @@ const http: HttpClient = {
         ws.removeEventListener('message', onMessage)
       }
 
-      ws.addEventListener('message', onMessage);
-    });
+      ws.onopen = async () => {
+        retryCount = 0
+        ws.addEventListener('message', onMessage);
+        ws.send(
+          JSON.stringify({
+            method,
+            location: url.slice(
+              url.indexOf(location.host) + location.host.length
+            ),
+            ...headers,
+          })
+        );
+
+        ws.send(JSON.stringify({ sendHeaders: true }))
+
+        if (body) {
+          const iterator = body as AsyncIterable<Uint8Array>;
+
+          for await (const chunk of iterator) {
+            ws.send(chunk);
+          }
+        }
+      };
+    })
   },
 };
 

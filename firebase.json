@@ -13,7 +13,9 @@
       },
       {
         "source": "/code/**",
-        "function": "code"
+        "function": {
+          "functionId": "code"
+        }
       }
     ]
   },

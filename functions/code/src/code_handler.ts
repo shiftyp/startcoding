@@ -12,10 +12,10 @@ export const handler = async (headers: Headers, stream: stream.Duplex) => {
       await project.proxy(headers, stream);
     } catch (e) {
       console.log(e);
-      stream.write(500);
+      stream.write(JSON.stringify({ status: 500 }));
     }
   } else {
-    stream.write(404);
+    stream.write(JSON.stringify({ status: 404 }));
   }
 };
 

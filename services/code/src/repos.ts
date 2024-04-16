@@ -10,19 +10,15 @@ import pfs from "fs/promises";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { initializeApp } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
+import  { Storage } from "@google-cloud/storage"
 import stream from "stream";
 
-const app = initializeApp()
-
 const uploadRepo = async (id: string, uuid: string) => {
-  // @ts-ignore
-  const bucket = new getStorage(app).bucket("gs://woofjs2-repos");
+  const bucket = new Storage().bucket("gs://woofjs2-repos");
   const root = path.join(os.tmpdir(), uuid);
   const stream = tar.c({ gzip: true, z: true, cwd: root }, ["./"]);
   console.log('then went here')
-  const file = bucket.file(`${id}.tgz`);
+  const file = bucket.file(`${id}.tgz`)
   console.log('then got here')
 
   return await new Promise((resolve, reject) => {
@@ -32,8 +28,9 @@ const uploadRepo = async (id: string, uuid: string) => {
   });
 };
 
-const syncRepository = async (id: string): Promise<string> => {
-  const bucket = getStorage(app).bucket("gs://woofjs2-repos");
+const syncRepository =async (id: string): Promise<string> => {
+  console.log(Storage)
+  const bucket = new Storage().bucket("gs://woofjs2-repos");
   const uuid = UUID();
   const root = path.join(os.tmpdir(), uuid);
   const archive = path.join(os.tmpdir(), `${uuid}.tgz`);
@@ -84,8 +81,8 @@ const proxy = (
   stream: stream.Duplex
 ) => {
   const translatedUrl = headers.get("location")!.replace(id, uuid);
-  const REMOTE_USER = "system";
-  const REMOTE_EMAIL = "system@startcoding.dev";
+  const REMOTE_USER = "lulu";
+  const REMOTE_EMAIL = "lulu@woofjs.com";
   const dir = path.join(os.tmpdir(), uuid);
 
   const reqStream =
@@ -94,13 +91,13 @@ const proxy = (
       : stream;
 
   const resStream = reqStream.pipe(
-    backend(translatedUrl, function(err: Error, service: any) {
+    backend(translatedUrl, (err: Error, service: any) => {
       if (err) {
         stream.end(err + "\n");
         return;
       }
 
-      stream.write(JSON.stringify({ "content-type": service.type }), () => {
+      const streamGit = () => {
         const ps = spawn(service.cmd, service.args.concat([dir]), {
           env: {
             REMOTE_USER,
@@ -108,8 +105,13 @@ const proxy = (
             GIT_URL: translatedUrl?.slice(0, translatedUrl.indexOf(uuid)) + uuid,
           },
         });
+
         ps.stdout.pipe(service.createStream()).pipe(ps.stdin);
-      });
+      }
+
+      stream.write(JSON.stringify({ "content-type": service.type }), () => {
+        streamGit
+      })
     })
   );
 

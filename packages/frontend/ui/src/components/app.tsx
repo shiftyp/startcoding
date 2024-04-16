@@ -662,7 +662,7 @@ export const App = () => {
             </Stack>
             <Stack
               direction={"row"}
-              alignItems={"flex-end"}
+              justifyContent={"flex-end"}
               spacing={2}
               style={{
                 backgroundColor: "#6DC0F2",

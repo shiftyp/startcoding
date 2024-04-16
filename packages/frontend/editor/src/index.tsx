@@ -35,26 +35,12 @@ export const CodeEditor = ({ file, code, readme, error, setCode, setReadme, setE
     if (error && monaco) {
       const model = monaco.editor.getModels()[0]
       if (model) {
-        getErrorInfo(model, error.line, error.column)
         monaco.editor.getEditors()[0].createDecorationsCollection([{
           options: {
             linesDecorationsClassName: 'error-line'
           },
           range: new monaco.Range(error.line, error.column, error.line, error.column)
         }])
-        const markers = [
-          {
-            startLineNumber: error.line,
-            endLineNumber: error.line,
-            startColumn: error.column,
-            endColumn: error.column,
-            message: error.messages.join('\n'),
-
-            severity: monaco.MarkerSeverity.Error
-          }
-        ]
-
-        monaco.editor.setModelMarkers(model, "owner", markers)
       }
     }
   }, [error, monaco])
