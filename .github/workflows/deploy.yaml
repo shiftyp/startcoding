@@ -26,3 +26,9 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: woofjs2-590cd
           channelId: live
+      - uses: FirebaseExtended/action-functions-deploy@v0
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+          projectId: woofjs2-590cd
+          channelId: live
