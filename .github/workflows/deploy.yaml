@@ -28,5 +28,5 @@ jobs:
           channelId: live
       - uses: jsryudev/deploy-firebase-functions@v18.0.0
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           FIREBASE_PROJECT: woofjs2-590cd
