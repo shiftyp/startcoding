@@ -103,8 +103,5 @@
     {
       "path": "../types"
     }
-  ],
-  "files": [
-    "src/game_worker.ts"
   ]
 }

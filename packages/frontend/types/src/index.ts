@@ -1,6 +1,9 @@
 // @ts-ignore
 import { ColorMode } from "daltonize";
 export type Language = "javascript" | "python";
+import animations from './animations.json'
+
+export const animationInfo = animations
 
 export const ID = Symbol("id");
 export const KIND = Symbol("kind");
@@ -118,6 +121,23 @@ export type LineDescriptor = {
 } & PositionProperties &
   VisibilityProperties;
 
+export type Animations = typeof animations
+export type AnimationImages = keyof Animations
+export type AnimationCostumes = keyof Animations[AnimationImages]
+export type AnimationsAnimations = keyof Animations[AnimationImages][AnimationCostumes]
+
+export type AnimationDescriptor<Image extends keyof Animations, Costume extends keyof Animations[Image], Animation extends keyof Animations[Image][Costume]> = {
+  [KIND]: 'animation',
+  image: Image
+  costume: Costume,
+  animation: Animation
+  width: number;
+  height: number;
+  frame: number;
+  frameRate: number;
+} & PositionProperties &
+  VisibilityProperties;
+
 export type ElementDescriptor =
   | ImageDescriptor
   | TextDescriptor
@@ -126,7 +146,8 @@ export type ElementDescriptor =
   | CircleDescriptor
   | OvalDescriptor
   | LineDescriptor
-  | GroupDescriptor;
+  | GroupDescriptor
+  | AnimationDescriptor<AnimationImages, AnimationCostumes, AnimationsAnimations>;
 
 export type ElementDescriptorOfKind<
   Kind extends ElementDescriptor[typeof KIND]
@@ -157,7 +178,8 @@ export type Change =
   | { kind: "polygon"; descriptor: PolygonDescriptor }
   | { kind: "oval"; descriptor: OvalDescriptor }
   | { kind: "group"; descriptor: GroupDescriptor }
-  | { kind: "backdrop"; descriptor: BackdropDescriptor };
+  | { kind: "backdrop"; descriptor: BackdropDescriptor }
+  | { kind: "animation"; descriptor: AnimationDescriptor<AnimationImages, AnimationCostumes, AnimationsAnimations> };
 
 export type ChangeSet = Array<[number, Array<Change>]>;
 

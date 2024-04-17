@@ -1,6 +1,7 @@
 import { CircleSprite } from "./canvas_components/circle";
 import { ImageSprite } from "./canvas_components/image";
 import {
+  Change,
   ChangeSet,
   KIND,
   TextDescriptor,
@@ -11,6 +12,7 @@ import { LineSprite } from "./canvas_components/line";
 import { TextSprite } from "./canvas_components/text";
 import { BackdropSprite } from "./canvas_components/backdrop";
 import { ColorMode } from 'daltonize'
+import { AnimationSprite } from "./canvas_components/animation";
 
 let spriteCanvas = new OffscreenCanvas(0, 0);
 let stageContext: WorkerStageContext = {
@@ -64,6 +66,9 @@ const render = async (changes: ChangeSet, tick: Tick) => {
             break;
           case "line":
             LineSprite(change.descriptor, stageContext);
+            break;
+          case 'animation':
+            AnimationSprite(change.descriptor, stageContext)
             break;
           case "text":
             TextSprite(change.descriptor, stageContext);

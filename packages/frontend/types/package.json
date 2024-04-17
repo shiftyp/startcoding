@@ -4,8 +4,8 @@
   "types": "./dist/index.d.ts",
   "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./lib": "dist/lib.d.ts"
+    ".": "./src/index.ts",
+    "./lib": "./dist/lib.d.ts"
   },
   "license": "MIT",
   "private": true,
@@ -17,6 +17,6 @@
     "daltonize": "1.0.2"
   },
   "devDependencies": {
-    "typescript": "5.2.2"
+    "typescript": "5.4.3"
   }
 }

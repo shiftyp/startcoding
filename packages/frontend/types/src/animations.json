@@ -1,0 +1,32 @@
+{
+  "spaceship": {
+    "spaceship1": {
+      "exhaust": {
+        "url": "https://firebasestorage.googleapis.com/v0/b/woofjs2-assets/o/spaceship.png?alt=media",
+        "frameHeight": 250,
+        "frameWidth": 210,
+        "frames": 62
+      },
+      "explosion": {
+        "url": "https://firebasestorage.googleapis.com/v0/b/woofjs2-assets/o/spaceship-explosion.png?alt=media",
+        "frameHeight": 199,
+        "frameWidth": 412,
+        "frames": 62
+      }
+    },
+    "spaceship2": {
+      "exhaust": {
+        "url": "https://firebasestorage.googleapis.com/v0/b/woofjs2-assets/o/spaceship2.png?alt=media",
+        "frameHeight": 278,
+        "frameWidth": 404,
+        "frames": 62
+      },
+      "explosion": {
+        "url": "https://firebasestorage.googleapis.com/v0/b/woofjs2-assets/o/spaceship2-explosion.png?alt=media",
+        "frameHeight": 286,
+        "frameWidth": 306,
+        "frames": 62
+      }
+    }
+  }
+}
