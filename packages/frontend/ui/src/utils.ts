@@ -2,6 +2,7 @@ import git, { HttpClient } from "isomorphic-git";
 import LightningFS from "@isomorphic-git/lightning-fs";
 import asyncify from "callback-to-async-iterator";
 import { getAuth } from "firebase/auth";
+import './import.meta'
 
 const createChunkCallback = (ws: WebSocket) => async (
   callback: (Uint8Array) => void
@@ -34,17 +35,28 @@ const maxRetries = 10
 const http: HttpClient = {
   request: async ({ url, method, headers, body }) => {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`wss://${import.meta.env.VITE_FIREBASE_CODE_FUNCTION}`);
-
-      ws.addEventListener('error', (err: Event) => {
+      const errorHandler = (err: Event) => {
         if (retryCount < maxRetries) {
           retryCount++;
           console.log(`Retrying connection attempt ${retryCount}...`);
-          http.request({ url, method, headers, body});
+          const response = http.request({ url, method, headers, body});
+          resolve(response)
         } else {
           console.error('websockets error:', err);
         }
-      })
+      }
+
+      let ws: WebSocket
+
+      try {
+        ws = new WebSocket(`wss://${import.meta.env.VITE_FIREBASE_CODE_FUNCTION}`);
+      } catch (e) {
+        // For Older Browsers
+        return errorHandler(e)
+      }
+      
+      // For newer browsers
+      ws.addEventListener('error', errorHandler)
 
       const onMessage = async (message) => {
         resolve({
