@@ -26,6 +26,6 @@ export const AnimationSprite = <Image extends keyof Animations, Costume extends 
       .translateSelf(fromStageX(x), fromStageY(y), 0)
       .rotateSelf(-angle - 180);
     spriteContext.setTransform(transform);
-    spriteContext.drawImage(imageBitmap, Math.floor(clampedFrame / 16) * frameWidth, (clampedFrame % 16) * frameHeight, frameWidth, frameHeight, -width / 2, -height / 2, width, height);
+    spriteContext.drawImage(imageBitmap, (clampedFrame % Math.ceil(frames / 16)) * frameWidth, Math.floor(clampedFrame / Math.ceil(frames / 16)) * frameHeight, frameWidth, frameHeight, -width / 2, -height / 2, width, height);
   }
 };

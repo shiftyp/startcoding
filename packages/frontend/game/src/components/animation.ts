@@ -14,7 +14,7 @@ export class AnimationElement extends AbstractInteractiveElement<'animation'> {
       width: 0,
       height: 0,
       frame: 0,
-      frameRate: 1 / 60,
+      frameRate: 1 / 30,
       ...descriptor
     })
     let lastUpdate = 0
