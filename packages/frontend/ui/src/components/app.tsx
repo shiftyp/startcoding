@@ -165,11 +165,11 @@ export const App = () => {
 
   useEffect(() => {
     game?.setGameSpeed(gameSpeed);
-  }, [gameSpeed]);
+  }, [gameSpeed, game]);
 
   useEffect(() => {
     game?.setGeneratePalette(shouldGeneratePalette);
-  }, [shouldGeneratePalette]);
+  }, [shouldGeneratePalette, game]);
 
   const gameRoot = useRef<HTMLElement>(null);
 
@@ -622,7 +622,7 @@ export const App = () => {
                   }
                 }}
               >
-                {file !== null ? (
+                {file !== null && code !== null && readme !== null ? (
                   <>
                     <Tabs
                       aria-label="File Selection"

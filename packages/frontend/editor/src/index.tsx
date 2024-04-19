@@ -37,10 +37,15 @@ export const CodeEditor = ({ file, code, readme, error, setCode, setReadme, setE
       if (model) {
         monaco.editor.getEditors()[0].createDecorationsCollection([{
           options: {
-            linesDecorationsClassName: 'error-line'
+            linesDecorationsClassName: 'error-line',
+            isWholeLine: true,
+            blockClassName: 'error-line-background',
+            hoverMessage: error.messages.map(message => ({ value: message }))
           },
           range: new monaco.Range(error.line, error.column, error.line, error.column)
         }])
+
+        
       }
     }
   }, [error, monaco])

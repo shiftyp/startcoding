@@ -1,14 +1,17 @@
 import { CircleDescriptor, KIND, TreeNode } from "@startcoding/types";
 import { DESCRIPTOR, MAKE_NODE } from "../symbols";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
-import { z } from "zod";
-import { zd } from "../utils";
+import { validate } from "../utils";
 import SAT from 'sat'
 
+@validate({
+  radius: { type: 'number', min: 0, optional: true },
+  color: { type: 'string', min: 1, optional: true }
+})
 export class CircleElement extends AbstractInteractiveElement<'circle'> {
   constructor(descriptor: Partial<Omit<CircleDescriptor, typeof KIND>>) {
     super('circle', {
-      radius: 0,
+      radius: 10,
       color: "rgb(0,0,0)",
       ...descriptor,
     })
@@ -32,7 +35,7 @@ export class CircleElement extends AbstractInteractiveElement<'circle'> {
     return this[DESCRIPTOR].radius
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: 'number', min: 0 })
   set radius(value) {
     this[DESCRIPTOR].radius = value
   }
@@ -41,7 +44,7 @@ export class CircleElement extends AbstractInteractiveElement<'circle'> {
     return this[DESCRIPTOR].color
   }
 
-  @zd(z.function().args(z.string()))
+  @validate({ type: 'string', min: 1 })
   set color(value) {
     this[DESCRIPTOR].color = value
   }

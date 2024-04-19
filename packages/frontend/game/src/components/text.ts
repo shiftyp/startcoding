@@ -1,8 +1,7 @@
-import { ZodError, z } from 'zod'
 import { addTick } from '../loop';
 import { TextDescriptor, KIND, TreeNode } from '@startcoding/types';
 import { REMOVE_TICK, DESCRIPTOR, MAKE_NODE } from '../symbols';
-import { zd } from '../utils';
+import { validate } from '../utils';
 import { AbstractInteractiveElement } from './abstract_interactive_element';
 import SAT from 'sat'
 
@@ -14,6 +13,16 @@ addTick((tick) => {
   textCanvas.width = tick.globals.width;
 }, 0)
 
+@validate({
+  size: { type: 'number', min: 0, optional: true },
+  fontFamily: { type: "string", min: 1, optional: true },
+  color: { type: 'string', min: 1, optional: true },
+  textAlign: { type: 'string', pattern: /left|right|center/, optional: true },
+  text: [
+    { type: 'function', optional: true },
+    { type: 'string', optional: true}
+  ]
+})
 export class TextElement extends AbstractInteractiveElement<"text"> {
   [REMOVE_TICK] = addTick(() => {
     if (this.textFn) {
@@ -55,7 +64,10 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
     return node;
   };
 
-  @zd(z.function().args(z.union([z.function().returns(z.string()), z.string()])))
+  @validate([
+    { type: 'function' },
+    { type: 'string' }
+  ])
   set text(value: (() => string) | string) {
     if (typeof value === 'function') {
       this.textFn = value
@@ -74,7 +86,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].size
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: 'number', min: 0})
   set size(value) {
     this[DESCRIPTOR].size = value
   }
@@ -83,8 +95,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].color
   }
 
-  @zd(z.function().args(z.string()))
-
+  @validate({ type: 'string', min: 1 })
   set color(value) {
     this[DESCRIPTOR].color = value
   }
@@ -93,7 +104,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].fontFamily
   }
 
-  @zd(z.function().args(z.string()))
+  @validate({ type: 'string', min: 1 })
   set fontFamily(value) {
     this[DESCRIPTOR].fontFamily = value
   }
@@ -102,7 +113,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
     return this[DESCRIPTOR].textAlign
   }
 
-  @zd(z.function().args(z.string()))
+  @validate({ type: 'string', pattern: /left|right|center/ })
   set textAlign(value) {
     this[DESCRIPTOR].textAlign = value
   }

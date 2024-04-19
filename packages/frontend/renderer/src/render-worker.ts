@@ -13,6 +13,15 @@ import { TextSprite } from "./canvas_components/text";
 import { BackdropSprite } from "./canvas_components/backdrop";
 import { ColorMode } from 'daltonize'
 import { AnimationSprite } from "./canvas_components/animation";
+// @ts-ignore
+import url from '@flaticon/flaticon-uicons/css/uicons-regular-rounded-DWTIAQ4L.woff2?url'
+
+var uicons = new FontFace('uicons', `url(${url})`);
+
+uicons.load().then(function(font){
+  // @ts-expect-error
+  fonts.add(font);
+});
 
 let spriteCanvas = new OffscreenCanvas(0, 0);
 let stageContext: WorkerStageContext = {

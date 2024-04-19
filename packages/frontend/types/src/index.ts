@@ -130,9 +130,8 @@ export type AnimationDescriptor<Image extends keyof Animations, Costume extends 
   [KIND]: 'animation',
   image: Image
   costume: Costume,
-  animation: Animation
-  width: number;
-  height: number;
+  animation: Animation,
+  size: number,
   frame: number;
   frameRate: number;
 } & PositionProperties &

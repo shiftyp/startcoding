@@ -102,16 +102,32 @@ button {
   display: flex;
 }
 
+.error-line-background {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 0, 0, 0.05),
+    rgba(255, 0, 0, 0.05) 3px,
+    rgba(255,0, 0, 0.1) 3px,
+    rgba(255,0, 0, 0.1) 6px
+  );
+}
+
 .error-line {
   display: flex;
   align-items: flex-end;
   justify-content: center;
 }
 
-.error-line {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
+.error-line:after {
+  height: 0;
+  width: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 5px solid rgba(255, 0, 0, 0.4);
+  content: ' ';
+  position: absolute;
+  right: 0;
+  z-index: -1;
 }
 
 .error-line:before {
@@ -132,10 +148,15 @@ button {
   font-weight: bold !important;
   font-variant: normal;
   text-transform: none;
-  line-height: 1.625em;
+  line-height: 1.665em;
   height: 110%;
   text-align: right;
   display: block;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  content: "\f3a5";
+  position: absolute;
+  overflow-x: visible;
+  right: 5px;
+  z-index: 2;
 }

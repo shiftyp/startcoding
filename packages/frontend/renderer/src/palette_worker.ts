@@ -33,8 +33,8 @@ onmessage = async (message: MessageEvent<[action: 'generatePalette', tick: Tick,
       buffer.set(paletteArray);
       paletteCanvas.width = paletteData.width
       paletteCanvas.height = paletteData.height
-      paletteResizeCanvas.height = Math.ceil(paletteData.height * 450 / 16)
-      paletteResizeCanvas.width = 450
+      paletteResizeCanvas.height = Math.ceil(paletteData.height * 426 / 16)
+      paletteResizeCanvas.width = 426
       paletteContext.imageSmoothingEnabled = false
       paletteResizeContext.imageSmoothingEnabled = false
       paletteContext.putImageData(paletteData, 0, 0)

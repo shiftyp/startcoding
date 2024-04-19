@@ -5,6 +5,7 @@ export default {
     rollupOptions: {
       external: ['node-fetch']
     },
+    target: 'chrome91',
   },
   worker: {
     format: 'es',

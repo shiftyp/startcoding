@@ -3,6 +3,7 @@ import { getRegisteredElements } from "./register";
 import { TreeNode } from "@startcoding/types";
 import { NODE } from "./symbols";
 import SAT from 'sat'
+import { getError } from "./loop";
 
 let spriteTree = new RBush<{
   id: number;
@@ -10,6 +11,7 @@ let spriteTree = new RBush<{
 }>();
 
 setInterval(() => {
+  if (getError()) return;
   spriteTree = new RBush(50);
   const registeredElements = getRegisteredElements()
   if (registeredElements && registeredElements.size) {

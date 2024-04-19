@@ -1,10 +1,15 @@
 import { LineDescriptor, KIND, TreeNode } from "@startcoding/types";
-import { z } from "zod";
 import { DESCRIPTOR, MAKE_NODE } from "../symbols";
-import { zd } from "../utils";
+import { validate } from "../utils";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import SAT from 'sat'
 
+@validate({
+  x1: { type: 'number', optional: true },
+  y1: { type: 'number', optional: true },
+  color: { type: 'string', min: 1, optional: true },
+  width: { type: 'number', min: 0, optional: true }
+})
 export class LineElement extends AbstractInteractiveElement<"line"> {
   constructor(descriptor: Partial<Omit<LineDescriptor, typeof KIND>>) {
     super('line', {
@@ -39,7 +44,7 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].color
   }
 
-  @zd(z.function().args(z.string()))
+  @validate({ type: 'string' })
   set color(value) {
     this[DESCRIPTOR].color = value
   }
@@ -48,7 +53,7 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].width
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: 'number', min: 0 })
   set width(value) {
     this[DESCRIPTOR].width = value
   }
@@ -57,7 +62,7 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].x1
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: 'number' })
   set x1(value) {
     this[DESCRIPTOR].x1 = value
   }
@@ -66,7 +71,7 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
     return this[DESCRIPTOR].y1
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: 'number' })
   set y1(value) {
     this[DESCRIPTOR].y1 = value
   }

@@ -14,7 +14,8 @@
     "prepublish": "yarn build"
   },
   "dependencies": {
-    "daltonize": "1.0.2"
+    "daltonize": "1.0.2",
+    "@flaticon/flaticon-uicons": "3.1.0"
   },
   "devDependencies": {
     "typescript": "5.4.3"

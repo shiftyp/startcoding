@@ -2,7 +2,8 @@ import { KIND, Tick } from "@startcoding/types";
 import { getLayers, reset } from "./register";
 import { backdropDescriptor } from "./components/backdrop";
 import StackTrace from "stacktrace-js";
-import { ZodError } from "zod";
+
+let error: Error | null = null
 
 let scriptURL = ''
 
@@ -27,7 +28,24 @@ export const execute = async (url: string) => {
   await import(url)
 }
 
-export const callTick = async (tick: Tick) => {
+const reportError = async (e: Error) => {
+  let messages = [e.message]
+  const stack = await StackTrace.fromError(e)
+
+  const firstTrace = stack.find(trace => {
+    return trace.fileName === scriptURL
+  })!
+  
+  postMessage(['tickError', {
+    line: firstTrace.lineNumber,
+    column: firstTrace.columnNumber,
+    messages
+  }])
+}
+
+export const getError = () => error
+
+export const callTick = (tick: Tick) => {
   for (const key in tick.globals) {
     // @ts-expect-error
     self[key as keyof Tick["globals"]] = tick.globals[key as keyof Tick["globals"]];
@@ -37,38 +55,20 @@ export const callTick = async (tick: Tick) => {
     return priorityA - priorityB
   })
 
-  tickCallbackArray.forEach(async ([_, callbacks]) => {
+  tickCallbackArray.map(([_, callbacks]) => {
     try {
       callbacks.forEach(callback => callback(tick));
+      return true
     } catch(e: any) {
       if (e instanceof Error) {
-        let messages = [e.message]
-
-        if (e instanceof ZodError) {
-          const formatted = e.format()
-          // @ts-expect-error
-          messages = recursiveMessages(formatted)
-        }
-
-        const stack = await StackTrace.fromError(e)
-
-        const firstTrace = stack.find(trace => {
-          return trace.fileName === scriptURL
-        })!
-
-        if (!firstTrace) {
-          throw e
-        }
-
-        postMessage(['tickError', {
-          line: firstTrace.lineNumber,
-          column: firstTrace.columnNumber,
-          messages
-        }])
+        reportError(e)
+        error = e
+        throw e
       }
     }
   });
 
+  error = null
   update(tick);
 };
 

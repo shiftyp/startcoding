@@ -1,7 +1,10 @@
 import { ColorMode, RGBColor, daltonize } from "daltonize";
+// @ts-expect-error
+import ImageCacheWorker from './image_cache_worker?worker'
 
+const worker = new ImageCacheWorker() as Worker
 const imageCache: Record<string, ImageBitmap | true> = {};
-const processedCache: Map<ColorMode | null, Map<ImageBitmap, Map<number, Map<string, ImageBitmap>>>> = new Map();
+const processedCache: Map<ColorMode | null, Map<string, Map<number, Map<string, ImageBitmap | true>>>> = new Map();
 
 addEventListener(
   "message",
@@ -35,11 +38,11 @@ export const loadImageAsset = (
       processedCache.set(colorMode, colorModeMap)
     }
 
-    let opacityMap = colorModeMap!.get(image);
+    let opacityMap = colorModeMap!.get(url);
 
     if (!opacityMap) {
       opacityMap = new Map()
-      colorModeMap?.set(image, opacityMap)
+      colorModeMap?.set(url, opacityMap)
     }
     const clampedOpacity = Math.round(opacity)
     let processedMap = opacityMap.get(clampedOpacity)
@@ -50,38 +53,21 @@ export const loadImageAsset = (
     }
 
     if (!processedMap.has(filter)) {
-      const processingCanvas = new OffscreenCanvas(image.width, image.height)
-      const context = processingCanvas.getContext('2d')!
-      context.globalCompositeOperation = "lighten";
-      context.globalAlpha = clampedOpacity / 100
-      context.filter = filter
-      context.drawImage(image, 0, 0)
-      if (colorMode !== null) {
-        const imageData = context.getImageData(0, 0, image.width, image.height)
-        for (let i = 0; i < imageData.data.length; i += 4) {
-          const [r, g, b] = Array.from(imageData.data.slice(i, i + 3)) as RGBColor
-
-          const correctedRgb = daltonize([r, g, b], colorMode) as [number, number, number]
-
-
-          for (let j = 0; j < 3; j++) {
-            imageData.data[i + j] = correctedRgb[j]
-          }
-        }
-        context.putImageData(imageData, 0, 0)
-      }
-      const processedImage = processingCanvas.transferToImageBitmap()
-      processedMap.set(filter, processedImage)
+      worker.postMessage(['applyFilters', image, url, colorMode, clampedOpacity, filter])
+      processedMap.set(filter, true)
+      return null
+    } else if (processedMap.get(filter) === true) {
+      return null
     }
 
-    return processedMap.get(filter)!
+    return processedMap.get(filter)! as ImageBitmap
   }
   fetch(url)
     .then((res) => res.blob())
     .then((blob) => createImageBitmap(blob))
     .then((bitmap) => {
       imageCache[url] = bitmap
-      const map = new Map([[bitmap, new Map([[100, new Map([['', bitmap]])]])]])
+      const map = new Map([[url, new Map([[100, new Map([['', bitmap]])]])]])
       processedCache.set(null, map)
       loadImageAsset(url, opacity, filter, colorMode)
       return
@@ -89,3 +75,11 @@ export const loadImageAsset = (
   imageCache[url] = true;
   return null;
 };
+
+worker.addEventListener('message', (message: MessageEvent<[action: 'filtersApplied', url: string, colorMode: ColorMode, clampedOpacity: number, filter: string, processedImage: ImageBitmap]>) => {
+  const [action] = message.data
+  if (action === 'filtersApplied') {
+    const [_, url, colorMode, clampedOpacity, filter, processedImage] = message.data
+    processedCache.get(colorMode)!.get(url)!.get(clampedOpacity)!.set(filter, processedImage)
+  }
+})

@@ -1,45 +1,83 @@
-import { ZodFormattedError, z } from "zod";
+import FastestValidator, { ValidationSchema } from 'fastest-validator'
+export const validate = (...schema: Array<string | ValidationSchema>) => function <Value>(
+  this: any,
+  value: Value,
+  context?: DecoratorContext
+): Value {
+  // @ts-ignore
+  const v = schema.length && schema[schema.length - 1] instanceof FastestValidator ? schema.pop() as FastestValidator : new FastestValidator()
 
-export const zd = (zod: z.Schema) => (
-  value: any,
-  { kind }: DecoratorContext
-) => {
-  if (
-    (kind === "method" || kind === "setter") &&
-    zod instanceof z.ZodFunction
-  ) {
-    return zod.implement(value);
-  }
-};
-
-export const recursiveMessages = (
-  obj: ZodFormattedError<any>,
-  prefix: string | null = null
-): string[] => {
-  return Object.keys(obj).reduce((acc, key) => {
-    if (key === "_errors") {
-      return [
-        ...acc,
-        ...obj._errors.map((error) =>
-          prefix !== null ? `Issue with ${prefix}: ${error}` : error
-        ),
-      ];
+  const mapInput = function (this: any, input: ValidationSchema | string) {
+    if (typeof input === 'string' || input.hasOwnProperty('type')) {
+      if (typeof input !== 'string' && input.type === 'tuple') {
+        return {
+          ...input,
+          items: input.items.map(mapInput)
+        }
+      } else {
+        return input
+      }
     } else {
-      return [
-        ...acc,
-        ...recursiveMessages(
-          // @ts-expect-error
-          obj[key],
-          prefix !== null ? `${prefix}.${key}` : key
-        ),
-      ];
+      return {
+        $$type: 'object',
+        ...Object.keys(input).reduce((acc, key) => {
+          const current = mapInput(input[key])
+          acc[key] = current
+          return acc
+        }, {} as Record<string, ValidationSchema | string>)
+      }
     }
-  }, [] as string[]);
+  }
+
+  const check = v.compile({
+      arguments: {
+        type: 'tuple',
+        empty: schema.every(item => {
+          // @ts-expect-error
+          return item.hasOwnProperty('optional') && item.optional === true
+        }),
+        items: schema.map(mapInput)
+      }
+    })
+
+  if (
+    !context || (context.kind === "method" || context.kind === "setter")
+  ) {
+    return function (this: any, ...args: any[]) {
+      const validation = check({ arguments: args }, {
+        meta: {
+          target: this
+        }
+      })
+      if (Array.isArray(validation)) {
+        throw new TypeError(validation.map(({ message }) => message).join('\n'))
+      }
+      // @ts-expect-error
+      return value.apply(this, args)
+    } as Value;
+  } else if (context && context.kind === 'class') {
+    // @ts-expect-error
+    return class Validated extends value {
+      constructor(...args: any[]) {
+        super(...args)
+        const validation = check({ arguments: args }, {
+          meta: {
+            target: this
+          }
+        })
+        if (Array.isArray(validation)) {
+          throw new TypeError(validation.map(({ message }) => message).join('\n'))
+        }
+      }
+    }
+  }
+
+  return value
 };
 
 export const difference = <T>(setA: Set<T>, setB: Set<T>): Set<T> => {
   if (Set.prototype.hasOwnProperty("difference")) {
-    // @ts-ignore
+    // @ts-expect-error
     return setA.difference(setB);
   } else {
     const ret = new Set<T>();
@@ -60,6 +98,6 @@ declare global {
   }
 }
 
-Array.prototype.remove = function(item) {
+Array.prototype.remove = function (item) {
   this.splice(this.indexOf(item), 1);
 };

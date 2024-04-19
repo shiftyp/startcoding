@@ -15,7 +15,7 @@ onmessage = async (
     trigger(descriptor);
   } else if (action === "callTick") {
     const [_, tick] = message.data;
-    callTick(tick);
+    await callTick(tick);
   } else if (action === 'start') {
     const [_, url] = message.data
 

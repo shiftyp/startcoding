@@ -1,5 +1,5 @@
 import { KIND } from "@startcoding/types";
-import { z } from "zod";
+import { validate } from "../utils";
 
 export const backdropDescriptor = {
   [KIND]: "backdrop",
@@ -7,11 +7,10 @@ export const backdropDescriptor = {
   style: "cover",
 };
 
-const SetBackdropUrlSchema = z.function().args(z.string());
-
-export const setBackdropURLImpl = SetBackdropUrlSchema.implement((url: string) => {
+validate({ type: 'string', min: 1})
+export const setBackdropURLImpl = (url: string) => {
   backdropDescriptor.url = url;
-});
+}
 
 declare global {
   interface WorkerGlobalScope {

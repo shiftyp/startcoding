@@ -1,14 +1,7 @@
-import { z } from "zod";
 import { addTick } from "../loop";
+import { validate } from "../utils"
 
-export const After = z.function()
-  .args(
-    z.number().min(0),
-    z.union([z.literal('seconds'), z.literal('milliseconds')]),
-    z.function()
-  )
-
-export const after = After.implement((
+export const afterImpl = (
   duration: number,
   unit: "seconds" | "milliseconds",
   callback: () => void
@@ -34,7 +27,13 @@ export const after = After.implement((
       last = 0;
     }
   }, 1);
-});
+}
+
+const after = validate(
+  { type: 'number', min: 0},
+  { type: 'string', pattern: /second[s]?|millisecond[s]?/ },
+  { type: 'function' }
+)(afterImpl)
 
 declare global {
   interface WorkerGlobalScope {

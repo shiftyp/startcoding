@@ -50,6 +50,9 @@ export class GroupElement<Properties> extends AbstractElement {
     this[REMOVE_TICK] = addTick(() => {
       if (this[SHOULD_RENDER]) {
         const unset = setRenderingGroup(this)
+        for (const id of this[CHILDREN]) {
+          getRegisteredElements().get(id)?.delete()
+        }
         this[RENDER](this[DESCRIPTOR])
         this[SHOULD_RENDER] = false
         unset()
@@ -75,7 +78,7 @@ export class GroupElement<Properties> extends AbstractElement {
     }, {} as Record<keyof Properties, PropertyDescriptor>)
     )
 
-    Object.freeze(this)
+    // Object.freeze(this)
 
     if (!getRenderingGroup() === null) {
       getRenderingGroup()[CHILDREN].push(this[ID])

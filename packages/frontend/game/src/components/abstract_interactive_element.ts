@@ -1,22 +1,22 @@
 import { ElementDescriptor, ElementDescriptorOfKind, ID, KIND, TreeNode } from "@startcoding/types";
 import { CHILDREN, DESCRIPTOR, MAKE_NODE, NODE, NODE_PRIVATE, PARENT, RESET_NODE } from "../symbols";
-import { z } from "zod";
 import { addToLayer, getId, getRegisteredElements, isHovering, listenElement, registerElement, removeFromLayer, unregisterElement } from "../register";
 import { AbstractElement } from "./abstract_element";
 import { getSpriteTree } from "../collisions";
-import { zd } from "../utils";
+import { validate } from "../utils";
 import { getRenderingGroup } from "./group";
 import SAT from 'sat'
 
-const ElementDescriptorSchema = z.object({
-  x: z.optional(z.number()),
-  y: z.optional(z.number()),
-  angle: z.optional(z.number()),
-  layer: z.optional(z.number().min(0).max(100)),
-  opacity: z.optional(z.number().min(0).max(100)),
-  colorEffect: z.optional(z.number())
-})
 
+@validate('string', {
+  x: { type: "number", optional: true },
+  y: { type: "number", optional: true },
+  angle: { type: "number", optional: true},
+  layer: { type: "number", min: 0, max: 100, optional: true },
+  opacity: { type: "number", min: 0, max: 100, optional: true },
+  colorEffect: { type: "number", optional: true },
+  hidden: { type: "boolean", optional: true }
+})
 export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor[typeof KIND], 'backdrop'> = Exclude<ElementDescriptor[typeof KIND], 'backdrop'>> extends AbstractElement {
   [NODE_PRIVATE]: TreeNode | null = null;
 
@@ -26,7 +26,6 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
 
   constructor(kind: Kind, descriptor: Partial<Omit<ElementDescriptorOfKind<Kind>, typeof KIND>>) {
     super()
-    ElementDescriptorSchema.parse(descriptor)
     // @ts-ignore
     this[DESCRIPTOR] = {
       x: 0,
@@ -72,7 +71,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].layer
   }
 
-  @zd(z.function().args(z.number().min(0).max(100)))
+  @validate({ type: "number", min: 0, max: 100 })
   set layer(value) {
     if (!this.deleted) removeFromLayer(this[DESCRIPTOR]);
     this[DESCRIPTOR].layer = value;
@@ -83,7 +82,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].x
   };
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: "number" })
   set x(value: number) {
     this[DESCRIPTOR].x = value
     this[RESET_NODE]()
@@ -93,7 +92,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].y
   };
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: "number" })
   set y(value) {
     this[DESCRIPTOR].y = value
     this[RESET_NODE]()
@@ -103,7 +102,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].angle
   };
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: "number" })
   set angle(value) {
     this[DESCRIPTOR].angle = value
     this[RESET_NODE]()
@@ -113,6 +112,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].hidden
   };
 
+  @validate({ type: "boolean" })
   set hidden(value) {
     this[DESCRIPTOR].hidden = value
   };
@@ -121,7 +121,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].opacity
   };
 
-  @zd(z.function().args(z.number().min(0).max(100)))
+  @validate({ type: "number", min: 0, max: 100 })
   set opacity(value) {
     this[DESCRIPTOR].opacity = Math.round(Math.max(
       0,
@@ -133,6 +133,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     return this[DESCRIPTOR].colorEffect
   };
 
+  @validate({ type: "number" })
   set colorEffect(value) {
     this[DESCRIPTOR].colorEffect = value % 360
   };
@@ -150,7 +151,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     this.hidden = false;
   };
 
-  @zd(z.function().args(z.function()))
+  @validate({ type: 'function' })
   onMouseDown(callback: () => void) {
     listenElement(
       {
@@ -164,7 +165,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     );
   };
 
-  @zd(z.function().args(z.function()))
+  @validate({ type: 'function' })
   onMouseUp(callback: () => void) {
     listenElement(
       {
@@ -178,7 +179,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     );
   };
 
-  @zd(z.function().args(z.function()))
+  @validate({ type: 'function' })
   onMouseOver(callback: () => void) {
     listenElement(
       {
@@ -192,7 +193,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     );
   };
 
-  @zd(z.function().args(z.function()))
+  @validate({ type: 'function' })
   onMouseOut(callback: () => void) {
     listenElement(
       {
@@ -206,7 +207,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     );
   };
 
-  @zd(z.function().args(z.function()))
+  @validate({ type: 'function' })
   onMouseMove(callback: () => void) {
     listenElement(
       {
@@ -220,9 +221,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     );
   };
 
-  @zd(z.function().args(z.instanceof(AbstractElement, {
-    message: 'Expected a Sprite'
-  })))
+  @validate({ type: 'class', instanceOf: AbstractElement })
   touching(element: AbstractElement) {
     if (this[NODE] === null || element[NODE] === null) return false
     const otherCollider = element[NODE].collider;
@@ -249,6 +248,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
       .map(({ id }) => getRegisteredElements().get(id))
       .filter((element) => element && !element.deleted && element instanceof AbstractInteractiveElement && element.touching(this)) as AbstractInteractiveElement[];
   };
+  @validate({ type: 'class', instanceOf: AbstractElement })
   collideWith(element: AbstractInteractiveElement) { };
   distanceTo(other: AbstractInteractiveElement) {
     return Math.sqrt(
@@ -259,6 +259,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
   get mousedown() {
     return isHovering(this[ID]);
   };
+  @validate({ type: "number" })
   move(steps: number) {
     const rads = ((this.angle || 0) / 360) * 2 * Math.PI;
     const ratio = steps / Math.sin(Math.PI / 2);

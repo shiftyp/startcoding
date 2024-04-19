@@ -1,16 +1,11 @@
-import { z } from "zod";
+import Validator, { ValidationSchema } from "fastest-validator";
 import { addTick } from "../loop";
+import { validate } from "../utils";
 
-export const Every = z.function()
-  .args(
-    z.number().min(0),
-    z.union([z.literal('seconds'), z.literal('milliseconds')]),
-    z.function()
-  )
 
-export const every = Every.implement((
+export const everyImpl = (
   duration: number,
-  unit: "seconds" | "milliseconds",
+  unit: "seconds" | "second" | "milliseconds" | "millisecond",
   callback: () => void
 ) => {
   let last = 0;
@@ -21,9 +16,11 @@ export const every = Every.implement((
 
     switch (unit) {
       case "seconds":
+      case "second":
         scale = 1000;
         break;
       case "milliseconds":
+      case "millisecond":
         scale = 1;
         break;
     }
@@ -33,7 +30,13 @@ export const every = Every.implement((
       last = 0;
     }
   }, 1);
-});
+}
+
+const every = validate(
+  { type: 'number', min: 0 },
+  { type: 'string', pattern: /second[s]?|millisecond[s]?/ },
+  { type: 'function' }
+)(everyImpl)
 
 declare global {
   interface WorkerGlobalScope {

@@ -14,7 +14,7 @@ const createChunkCallback = (ws: WebSocket) => async (
     callback(buffer);
   };
 
-  ws.onmessage = handleChunk;
+  ws.addEventListener('message', handleChunk);
   ws.onclose = () => callback(null);
 };
 
@@ -34,68 +34,66 @@ const maxRetries = 10
 
 const http: HttpClient = {
   request: async ({ url, method, headers, body }) => {
-    return new Promise((resolve, reject) => {
-      const errorHandler = (err: Event) => {
-        if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`Retrying connection attempt ${retryCount}...`);
-          const response = http.request({ url, method, headers, body});
-          resolve(response)
-        } else {
-          console.error('websockets error:', err);
-        }
+    const errorHandler = (err: Event) => {
+      if (retryCount < maxRetries) {
+        retryCount++;
+        console.log(`Retrying connection attempt ${retryCount}...`);
+        const response = http.request({ url, method, headers, body});
+        return response
+      } else {
+        console.error('websockets error:', err);
+        throw err
       }
+    }
 
-      let ws: WebSocket
+    let ws: WebSocket
+    let generator: AsyncGenerator<ArrayBuffer>
 
-      try {
-        ws = new WebSocket(`wss://${import.meta.env.VITE_FIREBASE_CODE_FUNCTION}`);
-      } catch (e) {
-        // For Older Browsers
-        return errorHandler(e)
-      }
-      
-      // For newer browsers
-      ws.addEventListener('error', errorHandler)
+    try {
+      ws = new WebSocket(`wss://${import.meta.env.VITE_FIREBASE_CODE_FUNCTION}`);
+      generator = chunkGenerator(ws)
+    } catch (e) {
+      // For Older Browsers
+      return errorHandler(e)
+    }
 
-      const onMessage = async (message) => {
-        resolve({
-          url: url,
-          headers: JSON.parse(await message.data.text()) as Record<
-            string,
-            string
-          >,
-          body: chunkGenerator(ws),
-          statusCode: 200,
-          statusMessage: "Ok",
+    // For newer browsers
+    ws.addEventListener('error', errorHandler)
+    ws.addEventListener('open', async () => {
+      retryCount = 0
+      ws.send(
+        JSON.stringify({
+          method,
+          location: url.slice(
+            url.indexOf(location.host) + location.host.length
+          ),
+          ...headers,
         })
-        ws.removeEventListener('message', onMessage)
-      }
+      );
 
-      ws.onopen = async () => {
-        retryCount = 0
-        ws.addEventListener('message', onMessage);
-        ws.send(
-          JSON.stringify({
-            method,
-            location: url.slice(
-              url.indexOf(location.host) + location.host.length
-            ),
-            ...headers,
-          })
-        );
+      ws.send(JSON.stringify({ sendHeaders: true }))
 
-        ws.send(JSON.stringify({ sendHeaders: true }))
+      if (body) {
+        const iterator = body as AsyncIterable<Uint8Array>;
 
-        if (body) {
-          const iterator = body as AsyncIterable<Uint8Array>;
-
-          for await (const chunk of iterator) {
-            ws.send(chunk);
-          }
+        for await (const chunk of iterator) {
+          ws.send(chunk);
         }
-      };
-    })
+      }
+    });
+
+    const result = await new Blob([(await generator.next()).value]).text()
+
+    return {
+      url: url,
+      headers: JSON.parse(result) as Record<
+        string,
+        string
+      >,
+      body: generator,
+      statusCode: 200,
+      statusMessage: "Ok",
+    }
   },
 };
 

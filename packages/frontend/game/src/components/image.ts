@@ -1,15 +1,19 @@
 import { ImageDescriptor, KIND, TreeNode } from "@startcoding/types";
-import { z } from "zod";
 import { MAKE_NODE, DESCRIPTOR } from "../symbols";
-import { zd } from "../utils";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import SAT from 'sat'
+import { validate } from "../utils";
 
+@validate({
+  width: { type: "number", min: 0, optional: true },
+  height: { type: "number", min: 0, optional: true },
+  url: { type: 'string', min: 1, optional: true }
+})
 export class ImageElement extends AbstractInteractiveElement<'image'> {
   constructor(descriptor: Partial<Omit<ImageDescriptor, typeof KIND>>) {
     super('image', {
-      width: 0,
-      height: 0,
+      width: 10,
+      height: 10,
       url: "",
       ...descriptor
     })
@@ -62,7 +66,7 @@ export class ImageElement extends AbstractInteractiveElement<'image'> {
     return this[DESCRIPTOR].width
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: "number", min: 0 })
   set width(value) {
     this[DESCRIPTOR].width = value
   }
@@ -71,7 +75,7 @@ export class ImageElement extends AbstractInteractiveElement<'image'> {
     return this[DESCRIPTOR].height
   }
 
-  @zd(z.function().args(z.number()))
+  @validate({ type: "number", min: 0 })
   set height(value) {
     this[DESCRIPTOR].height = value
   }
@@ -80,7 +84,7 @@ export class ImageElement extends AbstractInteractiveElement<'image'> {
     return this[DESCRIPTOR].url
   }
 
-  @zd(z.function().args(z.string()))
+  @validate({ type: 'string', min: 1 })
   set url(value) {
     this[DESCRIPTOR].url = value
   }

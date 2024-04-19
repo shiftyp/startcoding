@@ -1,5 +1,5 @@
 import { BackdropDescriptor, ImageDescriptor, WorkerStageContext } from "@startcoding/types";
-import { loadImageAsset } from "../image-cache";
+import { loadImageAsset } from "../image_cache";
 
 export const BackdropSprite = (
   descriptor: BackdropDescriptor,

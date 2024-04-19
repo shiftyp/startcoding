@@ -61,11 +61,10 @@ addTick((tick) => {
     .reduce((acc, id) => {
       if (registeredElements.has(id)) {
         let element = registeredElements.get(id)!
-        while (element[PARENT] !== null) {
-          acc.add(element[PARENT])
-          element = registeredElements.get(element[PARENT])!
+        while (element) {
+          acc.add(element[ID])
+          element = registeredElements.get(element[PARENT]!)!
         }
-        acc.add(id)
       }
       return acc
     }, new Set<number>())
