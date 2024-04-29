@@ -29,12 +29,9 @@ export const ImageSprite = (
       .rotateSelf(-angle - 180);
     spriteContext.setTransform(transform);
     spriteContext.fillStyle = 'rgba(100, 100, 100, 0.5)'
-    spriteContext.strokeStyle = 'rgba(255, 255, 255, 0.9)'
-    spriteContext.lineWidth = width / 5
     spriteContext.fillRect(-width / 2, -height / 2, width, height)
-    spriteContext.strokeRect(-width / 2, -height / 2, width, height)
     spriteContext.font = `${width / 5}px uicons`;
-    spriteContext.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    spriteContext.fillStyle = 'rgba(255, 255, 255, 0.5)'
     const textSize = spriteContext.measureText("\ufb40")
     spriteContext.fillText("\ufb40", -textSize.width / 2, 0)
   }

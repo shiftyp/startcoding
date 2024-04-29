@@ -30,27 +30,28 @@ export const validate = (...schema: Array<string | ValidationSchema>) => functio
   }
 
   const check = v.compile({
-      arguments: {
-        type: 'tuple',
-        empty: schema.every(item => {
-          // @ts-expect-error
-          return item.hasOwnProperty('optional') && item.optional === true
-        }),
-        items: schema.map(mapInput)
-      }
-    })
+    $$root: true,
+    type: 'tuple',
+    empty: schema.every(item => {
+      // @ts-expect-error
+      return item.hasOwnProperty('optional') && item.optional === true
+    }),
+    items: schema.map(mapInput)
+  })
 
   if (
     !context || (context.kind === "method" || context.kind === "setter")
   ) {
+    const options = {
+      meta: {
+        target: null as any
+      }
+    }
     return function (this: any, ...args: any[]) {
-      const validation = check({ arguments: args }, {
-        meta: {
-          target: this
-        }
-      })
+      options.meta.target = this
+      const validation = check(args, options)
       if (Array.isArray(validation)) {
-        throw new TypeError(validation.map(({ message }) => message).join('\n'))
+        throw new TypeError(validation.map(({ message }) => message?.replace("''", "'arguments'")).join('\n'))
       }
       // @ts-expect-error
       return value.apply(this, args)
@@ -60,13 +61,13 @@ export const validate = (...schema: Array<string | ValidationSchema>) => functio
     return class Validated extends value {
       constructor(...args: any[]) {
         super(...args)
-        const validation = check({ arguments: args }, {
+        const validation = check(args, {
           meta: {
             target: this
           }
         })
         if (Array.isArray(validation)) {
-          throw new TypeError(validation.map(({ message }) => message).join('\n'))
+          throw new TypeError(validation.map(({ message }) => message?.replace("''", "'arguments'")).join('\n'))
         }
       }
     }

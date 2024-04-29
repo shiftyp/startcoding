@@ -160,3 +160,27 @@ button {
   right: 5px;
   z-index: 2;
 }
+
+.code-snippet {
+  position: relative;
+  padding: 1em;
+}
+
+.code-snippet:hover:after, .code-snippet:focus:after {
+  content: 'click or press enter to copy';
+  font-size: 0.75em;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  transform: translateY(110%);
+  overflow: visible;
+  display: block;
+}
+
+.code-snippet:hover:after {
+  content: 'Click to copy';
+}
+
+.code-snippet:focus:after {
+  content: 'Press enter to copy';
+}

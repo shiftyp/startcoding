@@ -2,12 +2,19 @@ import { KIND, Tick } from "@startcoding/types";
 import { getLayers, reset } from "./register";
 import { backdropDescriptor } from "./components/backdrop";
 import StackTrace from "stacktrace-js";
+import { buildSpriteTree } from "./collisions";
+import protobuf from 'protobufjs'
+// @ts-ignore
+import protoUrl from '@startcoding/types/changeset.proto?url'
+import { MinGCWriter } from './writer'
 
 let error: Error | null = null
 
 let scriptURL = ''
 
 let tickCallbacks: Map<number, Set<(tick: Tick) => void>> = new Map();
+
+const protoPromise = protobuf.load(protoUrl)
 
 export const addTick = (callback: (tick: Tick) => void, priority: number) => {
   if (!tickCallbacks.has(priority)) {
@@ -22,13 +29,39 @@ export const addTick = (callback: (tick: Tick) => void, priority: number) => {
   }
 };
 
+export const addAsyncTick = <T>(callback: (tick: Tick) => Promise<T>): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const remove = addTick(async (tick) => {
+      remove()
+      try {
+        resolve(await callback(tick))
+      } catch (e) {
+        if (e instanceof Error) {
+          reportError(e)
+        } else if (typeof e === 'string') {
+          reportError(new Error(e))
+        } else {
+          throw new TypeError('Unable to report thrown error')
+        }
+      }
+    }, 1)
+  })
+  
+}
+
 export const execute = async (url: string) => {
   reset()
   scriptURL = url
-  await import(url)
+  try {
+    await import(url)
+  } catch(e) {
+    if (e instanceof Error) {
+      reportError(e, 'loadError')
+    }
+  }
 }
 
-const reportError = async (e: Error) => {
+const reportError = async (e: Error, kind: 'tickError' | 'loadError' = 'tickError') => {
   let messages = [e.message]
   const stack = await StackTrace.fromError(e)
 
@@ -36,7 +69,7 @@ const reportError = async (e: Error) => {
     return trace.fileName === scriptURL
   })!
   
-  postMessage(['tickError', {
+  postMessage([kind, {
     line: firstTrace.lineNumber,
     column: firstTrace.columnNumber,
     messages
@@ -69,24 +102,28 @@ export const callTick = (tick: Tick) => {
   });
 
   error = null
+
   update(tick);
+  
+  return Promise.resolve().then(buildSpriteTree)
 };
 
 const update = async (tick: Tick) => {
-  const serialized = Array.from(getLayers().entries())
+  const root = await protoPromise
+  const layerProto = root.lookupType('types.ChangeSet')
+  const toSerialize = {
+    layers: Array.from(getLayers().entries())
     .sort(([aIndex], [bIndex]) => aIndex - bIndex)
-    .map(([index, layer]) => [index, Array.from(layer).map(({ [KIND]: kind, ...rest }) => ({ kind, descriptor: rest }))]);
-
-  if (backdropDescriptor) {
-    // @ts-expect-error
-    (serialized as ChangeSet).unshift([-1e10, [{ kind: 'backdrop', descriptor: backdropDescriptor }]])
+    .map(([index, layer]) => ({
+      index,
+      layer: Array.from(layer)
+    }))
   }
 
-  const buffer = new TextEncoder().encode(JSON.stringify(serialized)).buffer;
-
-  postMessage(["update", buffer, tick], {
-    transfer: [buffer]
-  });
+  const buffer = layerProto.encode(layerProto.create(toSerialize), new MinGCWriter()).finish()
+  postMessage(["update", buffer.buffer, tick], {
+    transfer: [buffer.buffer]
+  });  
 };
 
 export const resetTickCallbacks = () => {

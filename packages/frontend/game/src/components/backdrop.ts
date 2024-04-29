@@ -1,8 +1,8 @@
-import { KIND } from "@startcoding/types";
+import { BackdropDescriptor, KIND } from "@startcoding/types";
 import { validate } from "../utils";
 
-export const backdropDescriptor = {
-  [KIND]: "backdrop",
+export const backdropDescriptor: BackdropDescriptor = {
+  kind: "backdrop",
   url: "",
   style: "cover",
 };

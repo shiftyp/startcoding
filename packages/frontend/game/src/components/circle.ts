@@ -1,15 +1,15 @@
 import { CircleDescriptor, KIND, TreeNode } from "@startcoding/types";
-import { DESCRIPTOR, MAKE_NODE } from "../symbols";
+import { DESCRIPTOR, MAKE_NODE, NODE_PRIVATE } from "../symbols";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import { validate } from "../utils";
-import SAT from 'sat'
+import SAT, { Circle } from 'sat'
 
 @validate({
   radius: { type: 'number', min: 0, optional: true },
   color: { type: 'string', min: 1, optional: true }
 })
 export class CircleElement extends AbstractInteractiveElement<'circle'> {
-  constructor(descriptor: Partial<Omit<CircleDescriptor, typeof KIND>>) {
+  constructor(descriptor: Partial<Omit<CircleDescriptor, "kind">>) {
     super('circle', {
       radius: 10,
       color: "rgb(0,0,0)",
@@ -19,7 +19,7 @@ export class CircleElement extends AbstractInteractiveElement<'circle'> {
 
   [MAKE_NODE]() {
     const { radius, x, y } = this[DESCRIPTOR];
-    let node: TreeNode = {} as TreeNode;
+    let node = this[NODE_PRIVATE] ? this[NODE_PRIVATE] : {} as TreeNode;
 
     node.minX = this[DESCRIPTOR].x - radius;
     node.maxX = this[DESCRIPTOR].x + radius;
@@ -28,7 +28,7 @@ export class CircleElement extends AbstractInteractiveElement<'circle'> {
 
     node.collider = new SAT.Circle(new SAT.Vector(x, y), radius);
 
-    return node;
+    this[NODE_PRIVATE] = node;
   };
 
   get radius() {
@@ -48,6 +48,8 @@ export class CircleElement extends AbstractInteractiveElement<'circle'> {
   set color(value) {
     this[DESCRIPTOR].color = value
   }
+
+  jsonFn = function Circle() {}
 };
 
 declare global {

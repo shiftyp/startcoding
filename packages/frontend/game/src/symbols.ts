@@ -2,6 +2,7 @@ export const DESCRIPTOR = Symbol("descriptor");
 export const NODE = Symbol("node");
 export const NODE_PRIVATE = Symbol("nodePrivate");
 export const MAKE_NODE = Symbol("makeNode");
+export const MAKE_COLLIDER = Symbol("makeCollider");
 export const RESET_NODE = Symbol("resetNode");
 export const SHOULD_RENDER = Symbol("shouldRender");
 export const REMOVE_TICK = Symbol("removeTick");

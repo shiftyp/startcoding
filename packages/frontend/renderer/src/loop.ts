@@ -13,6 +13,7 @@ import {
 } from "@startcoding/types";
 import { createDOMRenderer } from './dom'
 import { ColorMode } from "daltonize";
+import { Message } from 'console-feed/lib/definitions/Component'
 // @ts-ignore
 import PalleteWorker from './palette_worker?worker'
 // @ts-ignore
@@ -128,7 +129,7 @@ export const game = async ({
       lastRenderedTick = tick;
       frames = data
     } else if (action === 'renderError') {
-      console.debug(message.data[0])
+      console.debug(message.data[1])
       rendering = false
     }
   };
@@ -306,7 +307,7 @@ export const game = async ({
     ) {
       stageContext.width = box.width;
       stageContext.height = box.height;
-      
+
       renderElements.forEach(([element]) => {
         element.height = box.height
         element.width = box.width
@@ -364,13 +365,15 @@ export const game = async ({
     computing = false;
   };
 
-  const updateBackdrop = (backdrop: BackdropDescriptor) => {
-    stageContext.backgroundLayer.style.backgroundImage = `url(${backdrop.url})`;
-    stageContext.backgroundLayer.style.backgroundSize = "cover";
-    stageContext.backgroundLayer.style.backgroundRepeat = "no-repeat";
-  };
+  let logMessage = (log: Message) => {
+    // Placeholder
+  }
 
-  const { callTick, reload, trigger, setOnError } = await createVM({ language, update, updateBackdrop });
+  const onLog = (log: Message) => {
+    logMessage(log)
+  }
+
+  const { callTick, reload, trigger, setOnError } = await createVM({ language, update, onLog });
 
   const renderDOMLayers = (domLayers: Set<[index: number, element: HTMLElement]>) => {
     const renderBody = renderFrame.contentDocument!.body
@@ -391,7 +394,7 @@ export const game = async ({
   renderFrame.contentDocument!.addEventListener("mouseleave", onmouseleave);
   renderFrame.contentDocument!.addEventListener("keydown", onkeydown);
   renderFrame.contentDocument!.addEventListener("keyup", onkeyup);
-  
+
   renderFrame.contentWindow!.requestAnimationFrame(renderLoop);
 
   renderFrame.style.visibility = "visible";
@@ -464,6 +467,9 @@ export const game = async ({
       pointerRemap = remap
       pointerRemapSensitivity = sensitivity
       showPointerLayer = !!Object.keys(remap).length
+    },
+    setLogMessage: (logger: typeof logMessage) => {
+      logMessage = logger
     }
   };
 };

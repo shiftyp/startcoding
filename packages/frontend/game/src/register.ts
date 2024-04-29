@@ -1,10 +1,11 @@
-import { ElementDescriptor, EventDescriptor, GlobalEventProperties, ID, LocalEventProperties } from "@startcoding/types";
+import { ElementDescriptor, EventDescriptor, GlobalEventProperties, ID, LocalEventProperties, KIND, BackdropDescriptor, FillerDescriptor } from "@startcoding/types";
 import { AbstractElement } from "./components/abstract_element";
 import { addTick, resetTickCallbacks } from "./loop";
 import { getSpriteTree } from "./collisions";
 import { PARENT, DESCRIPTOR } from "./symbols";
 import { difference } from "./utils";
 import SAT from 'sat'
+import { backdropDescriptor } from "./components/backdrop";
 
 
 let lastHoverIds = new Set<number>();
@@ -96,8 +97,10 @@ addTick((tick) => {
 
 
 let registeredElements: Map<number, AbstractElement>
-let layers: Map<number, Set<ElementDescriptor>> = new Map([
-  [0, new Set<ElementDescriptor>()],
+
+let layers: Map<number, Set<ElementDescriptor | BackdropDescriptor | FillerDescriptor>> = new Map([
+  [-1, new Set([backdropDescriptor])],
+  [0, new Set()]
 ]);
 
 let nextId = 0
@@ -132,10 +135,11 @@ export const removeFromLayer = (descriptor: ElementDescriptor) => {
 };
 
 export const addToLayer = (descriptor: ElementDescriptor) => {
+
   if (!layers.has(descriptor.layer)) {
     layers.set(
       descriptor.layer,
-      new Set<ElementDescriptor>([descriptor])
+      new Set([descriptor])
     );
   } else {
     layers.get(descriptor.layer)!.add(descriptor);
@@ -172,8 +176,10 @@ export const listenElement = (
 
 export const reset = () => {
   registeredElements = new Map()
+
   layers = new Map([
-    [0, new Set<ElementDescriptor>()],
+    [-1, new Set([backdropDescriptor])],
+    [0, new Set()]
   ]);
   globalListeners = new Map();
   elementListeners = new Map();

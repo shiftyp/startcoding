@@ -7,8 +7,9 @@ import {
   AnimationsAnimations,
   AnimationDescriptor,
   animationInfo,
+  CircleDescriptor,
 } from "@startcoding/types";
-import { MAKE_NODE, DESCRIPTOR, REMOVE_TICK, LAST_UPDATE } from "../symbols";
+import { MAKE_NODE, DESCRIPTOR, REMOVE_TICK, LAST_UPDATE, NODE_PRIVATE, NODE, MAKE_COLLIDER } from "../symbols";
 import { addTick } from "../loop";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import SAT from "sat";
@@ -25,7 +26,7 @@ const v = new FastestValidator({
   },
 });
 
-const checkAnimationInfo = function(
+const checkAnimationInfo = function (
   this: any,
   value: string,
   schema: ValidationSchema,
@@ -33,6 +34,7 @@ const checkAnimationInfo = function(
   parent: any,
   context: {
     meta: {
+      // @ts-expect-error
       target: AnimationElement;
     };
   }
@@ -85,18 +87,18 @@ const checkAnimationInfo = function(
   },
   v
 )
-export class AnimationElement extends AbstractInteractiveElement<"animation"> {
-  [REMOVE_TICK]: () => void = () => {};
+export class AnimationElement<Image extends AnimationImages, Costume extends keyof Animations[Image], Animation extends keyof Animations[Image][Costume]> extends AbstractInteractiveElement<"animation"> {
+  [REMOVE_TICK]: () => void = () => { };
   [LAST_UPDATE] = 0;
   constructor(
     descriptor: Partial<
       Omit<
         AnimationDescriptor<
-          AnimationImages,
-          AnimationCostumes,
-          AnimationsAnimations
+          Image,
+          Costume,
+          Animation
         >,
-        typeof KIND
+        "kind"
       >
     >
   ) {
@@ -106,10 +108,52 @@ export class AnimationElement extends AbstractInteractiveElement<"animation"> {
       frameRate: 1 / 30,
       ...descriptor,
     });
-  }
+  };
+
+  [MAKE_COLLIDER]() {
+    let cached: SAT.Polygon | null = null
+
+    return () => {
+      if (this[NODE_PRIVATE]?.invalid || !cached) {
+        // @ts-ignore
+        const info = animationInfo[this.image][this.costume][this.animation];
+        const sizeRatio = this.size / 100;
+        const radians = (this[DESCRIPTOR].angle / 360) * 2 * Math.PI;
+        const polygon = new SAT.Polygon(
+          new SAT.Vector(this[DESCRIPTOR].x, this[DESCRIPTOR].y),
+          [
+            new SAT.Vector(
+              (-info.frameWidth * sizeRatio) / 2,
+              (-info.frameHeight * sizeRatio) / 2
+            ),
+            new SAT.Vector(info.frameWidth * sizeRatio, 0),
+            new SAT.Vector(0, info.frameHeight * sizeRatio),
+            new SAT.Vector(-info.frameWidth * sizeRatio, 0),
+          ]
+        )
+        polygon.rotate(radians);
+
+        cached = polygon
+      }
+      
+      return cached
+    }
+  };
 
   [MAKE_NODE]() {
-    let node: TreeNode = {} as TreeNode;
+    let node: TreeNode
+
+    if (!this[NODE_PRIVATE]) {
+      node = {} as TreeNode
+
+      Object.defineProperties(node, {
+        collider: {
+          get: this[MAKE_COLLIDER]()
+        }
+      })
+    } else {
+      node = this[NODE_PRIVATE]
+    }
     // @ts-ignore
     const info = animationInfo[this.image][this.costume][this.animation];
     const sizeRatio = this.size / 100;
@@ -140,22 +184,7 @@ export class AnimationElement extends AbstractInteractiveElement<"animation"> {
     node.minY = this[DESCRIPTOR].y - nodeWidth / 2;
     node.maxY = this[DESCRIPTOR].y + nodeHeight / 2;
 
-    node.collider = new SAT.Polygon(
-      new SAT.Vector(this[DESCRIPTOR].x, this[DESCRIPTOR].y),
-      [
-        new SAT.Vector(
-          (-info.frameWidth * sizeRatio) / 2,
-          (-info.frameHeight * sizeRatio) / 2
-        ),
-        new SAT.Vector(info.frameWidth * sizeRatio, 0),
-        new SAT.Vector(0, info.frameHeight * sizeRatio),
-        new SAT.Vector(-info.frameWidth * sizeRatio, 0),
-      ]
-    );
-
-    node.collider.rotate(radians);
-
-    return node;
+    this[NODE_PRIVATE] = node;
   }
 
   get size() {
@@ -261,8 +290,10 @@ export class AnimationElement extends AbstractInteractiveElement<"animation"> {
 
   stop() {
     this[REMOVE_TICK]();
-    this[REMOVE_TICK] = () => {};
+    this[REMOVE_TICK] = () => { };
   }
+  
+  jsonFn = function Animation() {}
 }
 
 declare global {

@@ -1,7 +1,7 @@
-import { ID, KIND } from "@startcoding/types";
+import { ElementDescriptor, ID, KIND } from "@startcoding/types";
 import { addTick } from "../loop";
 import { getId, getRegisteredElements, registerElement, unregisterElement } from "../register";
-import { REMOVE_TICK, SHOULD_RENDER, RENDER, CHILDREN, DESCRIPTOR, NODE } from "../symbols";
+import { REMOVE_TICK, SHOULD_RENDER, RENDER, CHILDREN, DESCRIPTOR, NODE, PARENT } from "../symbols";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import { AbstractElement } from "./abstract_element";
 
@@ -18,7 +18,7 @@ export const getRenderingGroup = () => {
   return renderingGroup[0]
 }
 
-export class GroupElement<Properties> extends AbstractElement {
+export abstract class GroupElement<Properties> extends AbstractElement<Properties> {
   [DESCRIPTOR]: Properties
   [REMOVE_TICK]: () => void;
   [SHOULD_RENDER] = true;
@@ -27,15 +27,6 @@ export class GroupElement<Properties> extends AbstractElement {
   [ID] = getId();
 
   [CHILDREN]: number[] = [];
-
-  // @ts-ignore
-  static create<Properties>(render: typeof GroupElement.prototype[typeof RENDER]) {
-    return function (descriptor: Omit<Properties, typeof KIND>) {
-      return new GroupElement<Properties>({
-        ...descriptor,
-      }, render);
-    }
-  }
 
   constructor(descriptor: Omit<Properties, typeof KIND>, render: (properties: Properties) => void) {
     super()
@@ -59,29 +50,11 @@ export class GroupElement<Properties> extends AbstractElement {
       }
     }, 2)
 
-    const propertyKeys = Object.keys(descriptor) as (keyof Properties)[]
+    const renderingGroup = getRenderingGroup()
 
-    Object.defineProperties(this, propertyKeys.reduce((acc, key) => {
-      if (!this.hasOwnProperty(key)) {
-        acc[key] = {
-          get: () => {
-            return this[DESCRIPTOR][key]
-          },
-          set: (value) => {
-            this[DESCRIPTOR][key] = value
-            this[SHOULD_RENDER] = true
-          }
-        }
-      }
-
-      return acc;
-    }, {} as Record<keyof Properties, PropertyDescriptor>)
-    )
-
-    // Object.freeze(this)
-
-    if (!getRenderingGroup() === null) {
-      getRenderingGroup()[CHILDREN].push(this[ID])
+    if (renderingGroup !== null) {
+      renderingGroup[CHILDREN].push(this[ID])
+      this[PARENT] = renderingGroup[ID]
     }
   }
 
@@ -95,7 +68,7 @@ export class GroupElement<Properties> extends AbstractElement {
     }
 
     this[REMOVE_TICK]()
-    
+    // @ts-ignore
     unregisterElement(this)
     this.deleted = true;
   }

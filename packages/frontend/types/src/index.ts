@@ -39,8 +39,13 @@ export type Tick = {
 
 export const INTERNAL = Symbol("internal");
 
+export type FillerDescriptor = {
+  kind: "filler",
+  hidden: true
+}
+
 export type BackdropDescriptor = {
-  [KIND]: "backdrop";
+  kind: "backdrop";
   url: string;
   style: "cover" | "fill";
 };
@@ -61,11 +66,11 @@ export type VisibilityProperties = {
 };
 
 export type GroupDescriptor = Record<PropertyKey, any> & {
-  [KIND]: "group";
+  kind: "group";
 };
 
 export type ImageDescriptor = {
-  [KIND]: "image";
+  kind: "image";
   url: string;
   width: number;
   height: number;
@@ -73,7 +78,7 @@ export type ImageDescriptor = {
   VisibilityProperties;
 
 export type TextDescriptor = {
-  [KIND]: "text";
+  kind: "text";
   text: string;
   color: string;
   fontFamily: string;
@@ -83,7 +88,7 @@ export type TextDescriptor = {
   VisibilityProperties;
 
 export type RectangleDescriptor = {
-  [KIND]: "rectangle";
+  kind: "rectangle";
   width: number;
   height: number;
   color: string;
@@ -91,21 +96,21 @@ export type RectangleDescriptor = {
   VisibilityProperties;
 
 export type PolygonDescriptor = {
-  [KIND]: "polygon";
+  kind: "polygon";
   sides: number;
   color: string;
 } & PositionProperties &
   VisibilityProperties;
 
 export type CircleDescriptor = {
-  [KIND]: "circle";
+  kind: "circle";
   radius: number;
   color: string;
 } & PositionProperties &
   VisibilityProperties;
 
 export type OvalDescriptor = {
-  [KIND]: "oval";
+  kind: "oval";
   width: number;
   height: number;
   color: string;
@@ -113,7 +118,7 @@ export type OvalDescriptor = {
   VisibilityProperties;
 
 export type LineDescriptor = {
-  [KIND]: "line";
+  kind: "line";
   x1: number;
   y1: number;
   width: number;
@@ -127,7 +132,7 @@ export type AnimationCostumes = keyof Animations[AnimationImages]
 export type AnimationsAnimations = keyof Animations[AnimationImages][AnimationCostumes]
 
 export type AnimationDescriptor<Image extends keyof Animations, Costume extends keyof Animations[Image], Animation extends keyof Animations[Image][Costume]> = {
-  [KIND]: 'animation',
+  kind: 'animation',
   image: Image
   costume: Costume,
   animation: Animation,
@@ -149,13 +154,14 @@ export type ElementDescriptor =
   | AnimationDescriptor<AnimationImages, AnimationCostumes, AnimationsAnimations>;
 
 export type ElementDescriptorOfKind<
-  Kind extends ElementDescriptor[typeof KIND]
+  Kind extends ElementDescriptor["kind"]
 > = ElementDescriptor & {
-  [KIND]: Kind;
+  kind: Kind;
 };
 
 export type TreeNodeInfo = {
   id: number;
+  invalid: boolean;
   collider: SAT.Polygon | SAT.Circle;
 };
 
@@ -168,19 +174,7 @@ export type TreeNodeBounds = {
 
 export type TreeNode = TreeNodeInfo & TreeNodeBounds;
 
-export type Change =
-  | { kind: "image"; descriptor: ImageDescriptor }
-  | { kind: "circle"; descriptor: CircleDescriptor }
-  | { kind: "line"; descriptor: LineDescriptor }
-  | { kind: "text"; descriptor: TextDescriptor }
-  | { kind: "rectangle"; descriptor: RectangleDescriptor }
-  | { kind: "polygon"; descriptor: PolygonDescriptor }
-  | { kind: "oval"; descriptor: OvalDescriptor }
-  | { kind: "group"; descriptor: GroupDescriptor }
-  | { kind: "backdrop"; descriptor: BackdropDescriptor }
-  | { kind: "animation"; descriptor: AnimationDescriptor<AnimationImages, AnimationCostumes, AnimationsAnimations> };
-
-export type ChangeSet = Array<[number, Array<Change>]>;
+export type ChangeSet = { layers: Array<{ index: number, layer?: Array<ElementDescriptor | BackdropDescriptor | FillerDescriptor> }> };
 
 export type GlobalEventProperties = {
   kind: string;

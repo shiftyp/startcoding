@@ -1,5 +1,5 @@
 import { LineDescriptor, KIND, TreeNode } from "@startcoding/types";
-import { DESCRIPTOR, MAKE_NODE } from "../symbols";
+import { DESCRIPTOR, MAKE_NODE, NODE_PRIVATE } from "../symbols";
 import { validate } from "../utils";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import SAT from 'sat'
@@ -11,7 +11,7 @@ import SAT from 'sat'
   width: { type: 'number', min: 0, optional: true }
 })
 export class LineElement extends AbstractInteractiveElement<"line"> {
-  constructor(descriptor: Partial<Omit<LineDescriptor, typeof KIND>>) {
+  constructor(descriptor: Partial<Omit<LineDescriptor, "kind">>) {
     super('line', {
       x1: 0,
       y1: 0,
@@ -23,7 +23,7 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
 
   [MAKE_NODE]() {
     const { width, x, y, x1, y1 } = this[DESCRIPTOR];
-    let node: TreeNode = {} as TreeNode;
+    let node: TreeNode = this[NODE_PRIVATE] ? this[NODE_PRIVATE] : {} as TreeNode;
 
     node.minX = Math.min(x, x1);
     node.maxX = Math.max(x, x1);
@@ -37,7 +37,7 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
       new SAT.Vector(-width / 2, y),
     ]);
 
-    return node;
+    this[NODE_PRIVATE] = node;
   };
 
   get color() {
@@ -75,6 +75,8 @@ export class LineElement extends AbstractInteractiveElement<"line"> {
   set y1(value) {
     this[DESCRIPTOR].y1 = value
   }
+
+  jsonFn = function Line() {}
 };
 
 

@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useMemo,
   useState,
+  useReducer
 } from "react";
 import { clone, commit, config, testFile } from "../utils";
 import { Language } from "@startcoding/types";
@@ -38,13 +39,19 @@ import TabList from "@mui/joy/TabList";
 import Tab from "@mui/joy/Tab";
 import StyledFirebaseAuth from "react-firebaseui/StyledFirebaseAuth";
 import Markdown from "react-markdown";
+import { Console, Decode } from "console-feed";
+import { Message } from "console-feed/lib/definitions/Component";
+import scratchBlocks from "../assets/scratch_blocks.svg?raw";
+import { DocsSection } from "./docs_section";
+import hexToRgb from 'hex-to-rgb'
+
 
 export const App = () => {
   const [currentUser, setCurrentUser] = useState(getAuth().currentUser);
   const [signIn, setSignIn] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [editorDrawer, setShowEditorDrawer] = useState<
-    "documentation" | "accessibility" | "readme" | false
+    "documentation" | "accessibility" | "readme" | "console" | false
   >(false);
   const [code, setCode] = useState<string | null>(null);
   const [readme, setReadme] = useState<string | null>(null);
@@ -82,10 +89,16 @@ export const App = () => {
   );
   const [pointerRemapSensitivity, setPointerRemapSensitivity] = useState(20);
   const [error, setError] = useState<{
-    line: number,
-    column: number,
-    messages: string[]
-  } | null>(null)
+    line: number;
+    column: number;
+    messages: string[];
+  } | null>(null);
+  // @ts-expect-error
+  const [logs, updateLogs] = useReducer(
+    (logs: Message[], newLog: Message) =>
+      [...logs, Decode(newLog)].slice(Math.min(-logs.length + 1, -100)),
+    [] as Message[]
+  );
 
   const loadCode = useCallback(async () => {
     await clone(fs, repoId);
@@ -105,7 +118,7 @@ export const App = () => {
     setGame(
       await renderGame({
         language: "javascript",
-        container: gameRoot.current!,
+        container: gameRoot.current!
       })
     );
   }, []);
@@ -114,11 +127,11 @@ export const App = () => {
     loadCode();
   }, []);
 
-  useEffect(() => { 
+  useEffect(() => {
     if (error) {
-      setGameSpeed(0)
+      setGameSpeed(0);
     }
-  }, [error])
+  }, [error]);
 
   useEffect(() => {
     if (currentUser) {
@@ -132,7 +145,8 @@ export const App = () => {
 
   useEffect(() => {
     game?.onUpdatePalette(setPaletteUrl);
-    game?.setOnError(setError)
+    game?.setOnError(setError);
+    game?.setLogMessage(updateLogs);
   }, [game]);
 
   useEffect(() => {
@@ -146,7 +160,7 @@ export const App = () => {
   useEffect(() => {
     if (resizing) {
       const resize = (e: MouseEvent) => {
-        setEditorWidth((editorWidth) => editorWidth - e.movementX);
+        setEditorWidth(editorWidth => editorWidth - e.movementX);
       };
       const stopResizing = () => {
         setResizing(false);
@@ -173,17 +187,27 @@ export const App = () => {
 
   const gameRoot = useRef<HTMLElement>(null);
 
+  const [color, setColor] = useState<string>('#000000')
+
   const documentation = (
     <div
       style={{
-        filter: "url(#colorFilter)",
+        overflow: "auto",
+        maxHeight: "100%"
       }}
     >
+      <svg
+        style={{ display: "none" }}
+        dangerouslySetInnerHTML={{ __html: scratchBlocks }}
+      ></svg>
       <AccordionGroup>
-        <Accordion>
-          <AccordionSummary>Title</AccordionSummary>
-          <AccordionDetails>Content</AccordionDetails>
-        </Accordion>
+        <DocsSection section="Motion" color="#4C97FF" blockHeight={56} />
+        <DocsSection section="Events" color="#FFBF00" blockHeight={136} />
+        <DocsSection section="Looks" color="#9966FF" blockHeight={56}>
+          <label style={{borderBottom: '5px dotted #444', padding: '0 0.75em 0 0.75em' }}>Pick a Color: <input type="color" value={color} onChange={(e) => setColor(e.target.value)} /><pre style={{backgroundColor: '#9966FF22'}}>
+          {`${color}\n//or\nrgb(${hexToRgb(color).join(', ')})`}</pre></label>
+        </DocsSection>
+        <DocsSection section="Control" color="#FFAB19" blockHeight={168} />
       </AccordionGroup>
     </div>
   );
@@ -202,7 +226,7 @@ export const App = () => {
     <div
       style={{
         overflow: "auto",
-        maxHeight: "100%",
+        maxHeight: "100%"
       }}
     >
       <AccordionGroup variant="outlined">
@@ -241,7 +265,7 @@ export const App = () => {
               <Input
                 value={pointerRemap.UP}
                 placeholder="Up"
-                onKeyUp={(event) => {
+                onKeyUp={event => {
                   setPointerRemap({ ...pointerRemap, UP: event.key });
                 }}
               />
@@ -251,7 +275,7 @@ export const App = () => {
               <Input
                 value={pointerRemap.DOWN}
                 placeholder="Down"
-                onKeyUp={(event) => {
+                onKeyUp={event => {
                   setPointerRemap({ ...pointerRemap, DOWN: event.key });
                 }}
               />
@@ -261,7 +285,7 @@ export const App = () => {
               <Input
                 value={pointerRemap.LEFT}
                 placeholder="Left"
-                onKeyUp={(event) => {
+                onKeyUp={event => {
                   setPointerRemap({ ...pointerRemap, LEFT: event.key });
                 }}
               />
@@ -271,7 +295,7 @@ export const App = () => {
               <Input
                 placeholder="Right"
                 value={pointerRemap.RIGHT}
-                onKeyUp={(event) => {
+                onKeyUp={event => {
                   setPointerRemap({ ...pointerRemap, RIGHT: event.key });
                 }}
               />
@@ -281,7 +305,7 @@ export const App = () => {
               <Input
                 value={pointerRemap.CLICK}
                 placeholder="Click"
-                onKeyUp={(event) => {
+                onKeyUp={event => {
                   setPointerRemap({ ...pointerRemap, CLICK: event.key });
                 }}
               />
@@ -311,7 +335,7 @@ export const App = () => {
               direction={"column"}
               spacing={2}
               sx={{
-                paddingTop: "2.5rem",
+                paddingTop: "2.5rem"
               }}
             >
               <h4>Game Palette</h4>
@@ -324,7 +348,7 @@ export const App = () => {
                     src={paletteUrl}
                     alt="Current Game Palette"
                     style={{
-                      filter: gameFilter,
+                      filter: gameFilter
                     }}
                   />
                 ) : null}
@@ -345,7 +369,7 @@ export const App = () => {
                   ["none", "none"],
                   ["protanope", "less red"],
                   ["deuteranope", "less green"],
-                  ["tritanope", "less blue"],
+                  ["tritanope", "less blue"]
                 ].map(([correction, label]) => {
                   return <Option value={correction}>{label}</Option>;
                 })}
@@ -399,6 +423,8 @@ export const App = () => {
     </div>
   );
 
+  const console = <Console logs={logs} variant="light" />;
+
   return (
     <>
       <Modal
@@ -416,14 +442,14 @@ export const App = () => {
                     setCurrentUser(getAuth().currentUser);
                     setSignIn(false);
                     return false;
-                  },
+                  }
                 },
                 signInOptions: [
                   {
                     provider: EmailAuthProvider.PROVIDER_ID,
-                    requireDisplayName: true,
-                  },
-                ],
+                    requireDisplayName: true
+                  }
+                ]
               }}
               firebaseAuth={getAuth()}
             />
@@ -436,7 +462,7 @@ export const App = () => {
           flexShrink: 1,
           minHeight: 0,
           minWidth: 0,
-          height: "100vh",
+          height: "100vh"
         }}
         direction={"column"}
       >
@@ -444,7 +470,7 @@ export const App = () => {
           sx={{
             backgroundColor: "#6DC0F2",
             padding: "1em",
-            height: "4.5rem",
+            height: "4.5rem"
           }}
         >
           <section aria-label="Toolbar">
@@ -461,7 +487,7 @@ export const App = () => {
               <Grid xs={2} md={2}>
                 <img
                   style={{
-                    height: "2rem",
+                    height: "2rem"
                   }}
                   src={logoUrl}
                   alt="Woof JS Logo"
@@ -507,7 +533,7 @@ export const App = () => {
                 aria-label="Game"
                 id="root"
                 style={{
-                  filter: `url(#colorFilter)`,
+                  filter: `url(#colorFilter)`
                 }}
               >
                 <iframe
@@ -515,7 +541,7 @@ export const App = () => {
                   style={{
                     visibility: resizing ? "hidden" : "visible",
                     border: "none",
-                    filter: gameFilter,
+                    filter: gameFilter
                   }}
                 ></iframe>
               </section>
@@ -534,8 +560,8 @@ export const App = () => {
                   await game?.reload(code!);
                   setLoaded(true);
                   setGame(game);
-                  setGameSpeed(playSpeed)
-                  setError(null)
+                  setGameSpeed(playSpeed);
+                  setError(null);
                 }}
               >
                 Start
@@ -562,7 +588,7 @@ export const App = () => {
             orientation="vertical"
             sx={{
               color: "white",
-              backgroundColor: "#6DC0F2",
+              backgroundColor: "#6DC0F2"
             }}
             onMouseDown={() => {
               setResizing(true);
@@ -578,7 +604,7 @@ export const App = () => {
                 flexShrink: 1,
                 minHeight: 0,
                 minWidth: 0,
-                maxHeight: '100%'
+                maxHeight: "100%"
               }}
             >
               {editorDrawer ? (
@@ -586,13 +612,15 @@ export const App = () => {
                   <Sheet
                     sx={{
                       width: "500px",
-                      padding: '1.5rem'
+                      padding: "1.5rem"
                     }}
                   >
                     {editorDrawer === "documentation" ? (
                       documentation
                     ) : editorDrawer === "accessibility" ? (
                       accessibility
+                    ) : editorDrawer === "console" ? (
+                      console
                     ) : (
                       <Markdown>{readme}</Markdown>
                     )}
@@ -604,15 +632,14 @@ export const App = () => {
                 direction="column"
                 sx={{
                   width: editorWidth,
-                  maxWidth: `calc(100vw - ${
-                    editorDrawer ? "20em - 500px" : "20em"
-                  })`,
+                  maxWidth: `calc(100vw - ${editorDrawer ? "20em - 500px" : "20em"
+                    })`,
                   minWidth: "20rem",
                   minHeight: 0,
                   flexGrow: 1,
-                  flexShrink: 1,
+                  flexShrink: 1
                 }}
-                ref={(el) => {
+                ref={el => {
                   if (el) {
                     setInterval(() => {
                       if (el.offsetWidth !== editorWidth) {
@@ -636,26 +663,26 @@ export const App = () => {
                         <Tab value={"README.md"}>README.md</Tab>
                       </TabList>
                     </Tabs>
-                      <section
-                        aria-label="Editor"
-                        style={{
-                          width: "100%",
-                          flexGrow: 1,
-                          flexShrink: 1,
-                          maxHeight: 'calc(100% - 1.5rem - 11px)'
-                        }}
-                      >
-                        <CodeEditor
-                          file={file}
-                          code={code}
-                          readme={readme}
-                          error={error}
-                          setError={setError}
-                          setCode={setCode}
-                          setReadme={setReadme}
-                        />
-                        )
-                      </section>
+                    <section
+                      aria-label="Editor"
+                      style={{
+                        width: "100%",
+                        flexGrow: 1,
+                        flexShrink: 1,
+                        maxHeight: "calc(100% - 1.5rem - 11px)"
+                      }}
+                    >
+                      <CodeEditor
+                        file={file}
+                        code={code}
+                        readme={readme}
+                        error={error}
+                        setError={setError}
+                        setCode={setCode}
+                        setReadme={setReadme}
+                      />
+                      )
+                    </section>
                   </>
                 ) : null}
               </Stack>
@@ -666,7 +693,7 @@ export const App = () => {
               spacing={2}
               style={{
                 backgroundColor: "#6DC0F2",
-                padding: "1em",
+                padding: "1em"
               }}
             >
               <Button
@@ -695,6 +722,15 @@ export const App = () => {
                 }}
               >
                 Toggle Documentation
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEditorDrawer(
+                    editorDrawer !== "console" ? "console" : false
+                  );
+                }}
+              >
+                Toggle Logs
               </Button>
               <Button
                 onClick={() => {

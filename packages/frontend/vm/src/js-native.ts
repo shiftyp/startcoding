@@ -5,6 +5,7 @@ import {
   Tick,
   BackdropDescriptor,
 } from '@startcoding/types'
+import { Message } from 'console-feed/lib/definitions/Component'
 
 // @ts-ignore
 import GameWorker from '@startcoding/game?worker'
@@ -18,7 +19,7 @@ let onError: (info: {
   message: string[]
 }) => void = () => {}
 
-const connectUpdate = (update: (elements: ArrayBuffer, tick: Tick) => void, updateBackdrop: (backdrop: BackdropDescriptor) => void) => {
+const connectUpdate = (update: (elements: ArrayBuffer, tick: Tick) => void, onLog: (log: Message) => void) => {
   gameWorker.addEventListener(
     'message',
     (
@@ -34,15 +35,19 @@ const connectUpdate = (update: (elements: ArrayBuffer, tick: Tick) => void, upda
             column: number,
             message: string[]
           }]
+        | [action: 'printToConsole', log: Message ]
       >
     ) => {
       const [action] = message.data
       if (action === 'update') {
         const [_, changes, tick] = message.data
         update(changes, tick)
-      } else if (action === 'tickError') {
+      } else if (action === 'tickError' || action === 'loadError') {
         const [_, info] = message.data
         onError(info)
+      } else if (action === 'printToConsole') {
+        const [_, log] = message.data
+        onLog(log)
       }
     }
   )
@@ -58,12 +63,12 @@ const callTick = (tick: Tick) => {
 
 export const createNativeVM = async ({
   update,
-  updateBackdrop
+  onLog
 }: {
   update: (elements: ArrayBuffer, tick: Tick) => void,
-  updateBackdrop: (backdrop: BackdropDescriptor) => void
+  onLog: (log: Message) => void
 }) => {
-  connectUpdate(update, updateBackdrop)
+  connectUpdate(update, onLog)
   
   return {
     callTick,

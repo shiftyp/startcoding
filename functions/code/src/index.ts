@@ -3,29 +3,20 @@ import {WebSocketServer, createWebSocketStream, WebSocket, RawData} from "ws";
 
 import {Server} from 'http'
 import { handler } from "./code_handler.js";
+import http from "http";
 
 let server: Server; // http.Server
 const wss = new WebSocketServer({noServer: true});
 
 const handleHandshake = (ws: WebSocket) => {
-  let headers: Headers | null = null
-
   const messageHandler = (data: RawData, isBinary: boolean) => {
     if (!isBinary) {
       const parsed = JSON.parse((data as unknown) as string);
-      if (parsed.sendHeaders) {
-        console.log('sendHeaders recieved')
-        const stream = createWebSocketStream(ws);
-
-        handler(headers!, stream);
-        ws.off("message", messageHandler);
-      } else {
-        console.log('Headers recieved')
-        headers = new Headers(parsed)
-      }
+      const headers = new Headers(parsed)
+      handler(headers, createWebSocketStream(ws))
     }
   };
-  ws.on("message", messageHandler);
+  ws.once("message", messageHandler);
 };
 
 wss.on('connection', ws => {

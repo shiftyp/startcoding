@@ -1,6 +1,6 @@
 import { addTick } from '../loop';
 import { TextDescriptor, KIND, TreeNode } from '@startcoding/types';
-import { REMOVE_TICK, DESCRIPTOR, MAKE_NODE } from '../symbols';
+import { REMOVE_TICK, DESCRIPTOR, MAKE_NODE, NODE_PRIVATE } from '../symbols';
 import { validate } from '../utils';
 import { AbstractInteractiveElement } from './abstract_interactive_element';
 import SAT from 'sat'
@@ -30,7 +30,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
     }
   }, 3)
   textFn: (() => string) | null = null
-  constructor(descriptor: Partial<Omit<TextDescriptor, typeof KIND>> | {
+  constructor(descriptor: Partial<Omit<TextDescriptor, "kind">> | {
     text?: () => string
   }) {
     super('text', {
@@ -47,7 +47,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
 
   [MAKE_NODE]() {
     const { x, y, text, size, fontFamily, textAlign } = this[DESCRIPTOR];
-    let node: TreeNode = {} as TreeNode;
+    let node: TreeNode = this[NODE_PRIVATE] ? this[NODE_PRIVATE] : {} as TreeNode;
 
     textContext.font = size + "px " + fontFamily;
     textContext.textAlign = textAlign;
@@ -61,7 +61,7 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
       new SAT.Vector(-width / 2, -size / 2),
     ]);
 
-    return node;
+    this[NODE_PRIVATE] = node;
   };
 
   @validate([
@@ -117,6 +117,8 @@ export class TextElement extends AbstractInteractiveElement<"text"> {
   set textAlign(value) {
     this[DESCRIPTOR].textAlign = value
   }
+
+  jsonFn = function Text() {}
 };
 
 declare global {

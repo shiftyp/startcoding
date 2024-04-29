@@ -15,7 +15,9 @@
     "lpsolver": "1.0.2",
     "rgbquant": "1.1.2",
     "color-space": "2.0.1",
-    "daltonize": "1.0.2"
+    "daltonize": "1.0.2",
+    "console-feed": "3.6.0",
+    "protobufjs": "7.2.6"
   },
   "devDependencies": {
     "@types/react": "18.2.67",

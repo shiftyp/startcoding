@@ -4,8 +4,8 @@ import { addToLayer, getId, getRegisteredElements, isHovering, listenElement, re
 import { AbstractElement } from "./abstract_element";
 import { getSpriteTree } from "../collisions";
 import { validate } from "../utils";
-import { getRenderingGroup } from "./group";
 import SAT from 'sat'
+import { getRenderingGroup } from "./group";
 
 
 @validate('string', {
@@ -17,14 +17,14 @@ import SAT from 'sat'
   colorEffect: { type: "number", optional: true },
   hidden: { type: "boolean", optional: true }
 })
-export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor[typeof KIND], 'backdrop'> = Exclude<ElementDescriptor[typeof KIND], 'backdrop'>> extends AbstractElement {
+export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDescriptor["kind"], 'backdrop'> = Exclude<ElementDescriptor["kind"], 'backdrop'>> extends AbstractElement<ElementDescriptorOfKind<Kind>> {
   [NODE_PRIVATE]: TreeNode | null = null;
 
   [DESCRIPTOR]: ElementDescriptorOfKind<Kind>;
 
-  abstract [MAKE_NODE](): TreeNode | null
+  abstract [MAKE_NODE](): void
 
-  constructor(kind: Kind, descriptor: Partial<Omit<ElementDescriptorOfKind<Kind>, typeof KIND>>) {
+  constructor(kind: Kind, descriptor: Partial<Omit<ElementDescriptorOfKind<Kind>, "kind">>) {
     super()
     // @ts-ignore
     this[DESCRIPTOR] = {
@@ -37,7 +37,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
       deleted: false,
       colorEffect: 0,
       ...descriptor,
-      [KIND]: kind
+      kind: kind
     }
 
     const renderingGroup = getRenderingGroup()
@@ -49,19 +49,18 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     }
 
     registerElement(this)
+
+    this[MAKE_NODE]()
   };
 
   [RESET_NODE]() {
-    this[NODE_PRIVATE] = null
+    if (this[NODE_PRIVATE]) this[NODE_PRIVATE].invalid = true
   };
 
   get [NODE]() {
-    if (this[NODE_PRIVATE] === null) {
-      const node = this[MAKE_NODE]()
-      if (node) {
-        node.id = this[ID]
-        this[NODE_PRIVATE] = node
-      }
+    if (this[NODE_PRIVATE] && this[NODE_PRIVATE].invalid) {
+      this[MAKE_NODE]()
+      this[NODE_PRIVATE]!.invalid = false
     }
 
     return this[NODE_PRIVATE]
@@ -224,8 +223,14 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
   @validate({ type: 'class', instanceOf: AbstractElement })
   touching(element: AbstractElement) {
     if (this[NODE] === null || element[NODE] === null) return false
-    const otherCollider = element[NODE].collider;
-    const selfCollider = this[NODE].collider;
+    const otherNode = element[NODE]
+    const selfNode = this[NODE]
+
+    if (selfNode.minX >= otherNode.maxX || otherNode.minX >= selfNode.maxX) return false;
+	  if (selfNode.minY >= otherNode.maxY || otherNode.minY >= selfNode.maxY) return false;
+
+    const otherCollider = otherNode.collider;
+    const selfCollider = selfNode.collider;
 
     if (otherCollider instanceof SAT.Polygon) {
       if (selfCollider instanceof SAT.Polygon) {

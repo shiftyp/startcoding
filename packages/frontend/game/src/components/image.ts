@@ -1,5 +1,5 @@
 import { ImageDescriptor, KIND, TreeNode } from "@startcoding/types";
-import { MAKE_NODE, DESCRIPTOR } from "../symbols";
+import { MAKE_NODE, DESCRIPTOR, NODE_PRIVATE } from "../symbols";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import SAT from 'sat'
 import { validate } from "../utils";
@@ -10,7 +10,7 @@ import { validate } from "../utils";
   url: { type: 'string', min: 1, optional: true }
 })
 export class ImageElement extends AbstractInteractiveElement<'image'> {
-  constructor(descriptor: Partial<Omit<ImageDescriptor, typeof KIND>>) {
+  constructor(descriptor: Partial<Omit<ImageDescriptor, "kind">>) {
     super('image', {
       width: 10,
       height: 10,
@@ -20,7 +20,7 @@ export class ImageElement extends AbstractInteractiveElement<'image'> {
   };
 
   [MAKE_NODE]() {
-    let node: TreeNode = {} as TreeNode;
+    let node: TreeNode = this[NODE_PRIVATE] ? this[NODE_PRIVATE] : {} as TreeNode;
 
     const radians = (this[DESCRIPTOR].angle / 360) * 2 * Math.PI;
     let constrainedAngle = Math.abs(radians % Math.PI);
@@ -59,7 +59,7 @@ export class ImageElement extends AbstractInteractiveElement<'image'> {
 
     node.collider.rotate(radians);
 
-    return node;
+    return this[NODE_PRIVATE] = node;
   }
 
   get width() {
@@ -88,6 +88,8 @@ export class ImageElement extends AbstractInteractiveElement<'image'> {
   set url(value) {
     this[DESCRIPTOR].url = value
   }
+
+  jsonFn = function Image() {}
 }
 
 declare global {

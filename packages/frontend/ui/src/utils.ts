@@ -4,9 +4,13 @@ import asyncify from "callback-to-async-iterator";
 import { getAuth } from "firebase/auth";
 import './import.meta'
 
-const createChunkCallback = (ws: WebSocket) => async (
-  callback: (Uint8Array) => void
-) => {
+const createChunkCallback = (ws: WebSocket) => {
+  let buffered: Array<ArrayBuffer | null> = []
+
+  let callback = (buffer: ArrayBuffer | null) => {
+    buffered.push(buffer)
+  }
+
   const handleChunk = async (evt: MessageEvent) => {
     const buffer = Buffer.from(
       (await (evt.data as Blob).arrayBuffer()) as ArrayBuffer
@@ -16,13 +20,29 @@ const createChunkCallback = (ws: WebSocket) => async (
 
   ws.addEventListener('message', handleChunk);
   ws.onclose = () => callback(null);
-};
 
-const chunkGenerator = async function*(ws: WebSocket) {
+  return (newCallback: (Uint8Array) => void) => {
+    callback = newCallback
+    buffered.forEach(callback)
+    return Promise.resolve()
+  }
+}
+
+const chunkGenerator = async function* (ws: WebSocket, method, url, headers) {
   const innerGenerator = asyncify(createChunkCallback(ws));
 
   let next: { value: Uint8Array | null; done: boolean };
 
+  ws.send(
+    JSON.stringify({
+      method,
+      location: url.slice(
+        url.indexOf(location.host) + location.host.length
+      ),
+      ...headers,
+    })
+  );
+  
   do {
     next = await innerGenerator.next();
     if (next.value) yield next.value;
@@ -32,46 +52,36 @@ const chunkGenerator = async function*(ws: WebSocket) {
 let retryCount = 0
 const maxRetries = 10
 
-const http: HttpClient = {
-  request: async ({ url, method, headers, body }) => {
+export const websocketClient: HttpClient = {
+  request: ({ url, method, headers, body }) => new Promise(async (resolve, reject) => {
     const errorHandler = (err: Event) => {
       if (retryCount < maxRetries) {
         retryCount++;
         console.log(`Retrying connection attempt ${retryCount}...`);
-        const response = http.request({ url, method, headers, body});
-        return response
+        const response = websocketClient.request({ url, method, headers, body });
+        resolve(response)
       } else {
         console.error('websockets error:', err);
-        throw err
+        reject(err)
       }
     }
 
     let ws: WebSocket
-    let generator: AsyncGenerator<ArrayBuffer>
+
 
     try {
       ws = new WebSocket(`wss://${import.meta.env.VITE_FIREBASE_CODE_FUNCTION}`);
-      generator = chunkGenerator(ws)
     } catch (e) {
       // For Older Browsers
       return errorHandler(e)
     }
-
     // For newer browsers
     ws.addEventListener('error', errorHandler)
-    ws.addEventListener('open', async () => {
-      retryCount = 0
-      ws.send(
-        JSON.stringify({
-          method,
-          location: url.slice(
-            url.indexOf(location.host) + location.host.length
-          ),
-          ...headers,
-        })
-      );
 
-      ws.send(JSON.stringify({ sendHeaders: true }))
+    let generator: AsyncGenerator<ArrayBuffer> = await new Promise((resolve, reject) => ws.addEventListener('open', async () => {
+      retryCount = 0
+
+      resolve(chunkGenerator(ws, method, url, headers))
 
       if (body) {
         const iterator = body as AsyncIterable<Uint8Array>;
@@ -80,11 +90,11 @@ const http: HttpClient = {
           ws.send(chunk);
         }
       }
-    });
+    }));
 
     const result = await new Blob([(await generator.next()).value]).text()
 
-    return {
+    resolve({
       url: url,
       headers: JSON.parse(result) as Record<
         string,
@@ -93,8 +103,8 @@ const http: HttpClient = {
       body: generator,
       statusCode: 200,
       statusMessage: "Ok",
-    }
-  },
+    })
+  })
 };
 
 export const config = async (
@@ -164,7 +174,7 @@ export const clone = async (fs, repo: string) => {
 
   await git.clone({
     fs,
-    http,
+    http: websocketClient,
     dir,
     url: repoUrl(repo)
   });
@@ -242,7 +252,7 @@ export const commit = async (
       fs,
       dir: "/code",
       remote: "origin",
-      http,
+      http: websocketClient,
       ref: "main",
     });
   }

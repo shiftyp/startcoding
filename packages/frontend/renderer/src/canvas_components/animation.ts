@@ -3,6 +3,8 @@ import { loadImageAsset } from "../image_cache";
 
 const sheetLength = 8
 
+const transform = new DOMMatrix()
+
 export const AnimationSprite = <Image extends keyof Animations, Costume extends keyof Animations[Image], Animation extends keyof Animations[Image][Costume]>(
   descriptor: AnimationDescriptor<Image, Costume, Animation>,
   stageContext: WorkerStageContext
@@ -25,24 +27,26 @@ export const AnimationSprite = <Image extends keyof Animations, Costume extends 
 
   let imageBitmap = loadImageAsset(url, opacity, filter, colorMode);
 
+  if (!transform.isIdentity) {
+    transform.a = transform.d = 1;
+    transform.b = transform.c = transform.e = transform.f = 0;
+  }
+
   if (imageBitmap) {
-    const transform = new DOMMatrix()
+    transform
       .translateSelf(fromStageX(x), fromStageY(y), 0)
       .rotateSelf(-angle - 180);
     spriteContext.setTransform(transform);
     spriteContext.drawImage(imageBitmap, (clampedFrame % Math.ceil(frames / sheetLength)) * frameWidth, Math.floor(clampedFrame / Math.ceil(frames / sheetLength)) * frameHeight, frameWidth, frameHeight, -width / 2, -height / 2, width, height);
   } else {
-    const transform = new DOMMatrix()
+    transform
       .translateSelf(fromStageX(x), fromStageY(y), 0)
       .rotateSelf(-angle - 180);
       spriteContext.setTransform(transform);
       spriteContext.fillStyle = 'rgba(100, 100, 100, 0.5)'
-      spriteContext.strokeStyle = 'rgba(255, 255, 255, 0.9)'
-      spriteContext.lineWidth = 1
       spriteContext.fillRect(-width / 2, -height / 2, width, height)
-      spriteContext.strokeRect(-width / 2, -height / 2, width, height)
       spriteContext.font = `${width / 2}px uicons`;
-      spriteContext.fillStyle = 'rgba(255, 255, 255, 0.9)'
+      spriteContext.fillStyle = 'rgba(255, 255, 255, 0.5)'
       const textSize = spriteContext.measureText("\ufb40")
       spriteContext.fillText("\ufb40", -textSize.width / 2, (textSize.actualBoundingBoxAscent + textSize.actualBoundingBoxDescent) / 2)
   }

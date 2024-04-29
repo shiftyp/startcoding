@@ -1,21 +1,22 @@
 import { BackdropDescriptor, ElementDescriptor, Language, Tick, Trigger } from '@startcoding/types'
 import {createNativeVM} from './js-native'
+import { Message } from 'console-feed/lib/definitions/Component'
 
 export const createVM = ({
   language,
   update,
-  updateBackdrop
+  onLog
 }: {
   language: Language,
   update: (elements: ArrayBuffer, tick: Tick) => void,
-  updateBackdrop: (backdrop: BackdropDescriptor) => void
+  onLog: (log: Message) => void
 }) => {
   switch (language) {
     case 'python':
       //runPY({ fs, register, listen, setCallTick, setTrigger })
       break
     case 'javascript':
-      return createNativeVM({ update, updateBackdrop })
+      return createNativeVM({ update, onLog })
       break;
   }
 

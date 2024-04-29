@@ -19,12 +19,7 @@ onmessage = async (
   } else if (action === 'start') {
     const [_, url] = message.data
 
-    try {
-      await execute(url)
-    } catch (e: any) {
-      postMessage(['loadError', e.toString()])
-      return
-    }
+    await execute(url)
 
     postMessage(['loaded'])
   }

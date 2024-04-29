@@ -10,7 +10,7 @@ let spriteTree = new RBush<{
   collider: SAT.Polygon | SAT.Circle;
 }>();
 
-setInterval(() => {
+export const buildSpriteTree = () => {
   if (getError()) return;
   spriteTree = new RBush(50);
   const registeredElements = getRegisteredElements()
@@ -18,6 +18,6 @@ setInterval(() => {
     const nodes = Array.from(registeredElements.values()).map(ele => ele[NODE]);
     spriteTree.load(nodes.filter(node => node !== null) as TreeNode[]);
   }
-}, 10);
+};
 
 export const getSpriteTree = () => spriteTree

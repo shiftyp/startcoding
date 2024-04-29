@@ -1,0 +1,53 @@
+package types;
+syntax = "proto3";
+
+message Descriptor {
+  string kind = 1;
+  // Position Properties
+  optional float x = 2;
+  optional float y = 3;
+  optional float angle = 4;
+  // Visibility Properties
+  optional bool hidden = 5;
+  optional int32 layer = 6;
+  optional float opacity = 7;
+  optional float colorEffect = 8;
+  // deleted not transferred
+  // Image Properties
+  optional string url = 9;
+  // Text Properties
+  optional string text = 10;
+  optional string fontFamily = 11;
+  optional string textAlign = 12;
+  // Rectangle Properties
+  // Polygon Properties
+  optional int32 sides = 13;
+  // Circle Descriptor
+  optional float radius = 14;
+  // Oval Properties
+  // Line Properties
+  optional float x1 = 15;
+  optional float y1 = 16;
+  // Animation Properties
+  optional string image = 17;
+  optional string costume = 18;
+  optional string animation = 19;
+  optional int32 frame = 20;
+  // frameRate not transferred
+  // BackdropDescriptor
+  optional string style = 21;
+  // Shared Properties
+  optional float size = 22;
+  optional string color = 23;
+  optional float width = 24;
+  optional float height = 25;
+}
+
+message Layer {
+  int32 index = 1;
+  repeated Descriptor layer = 2;
+}
+
+message ChangeSet {
+  repeated Layer layers = 1;
+}

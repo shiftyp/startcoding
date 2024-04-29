@@ -3,7 +3,7 @@ import { ColorMode, RGBColor, daltonize } from "daltonize";
 import ImageCacheWorker from './image_cache_worker?worker'
 
 const worker = new ImageCacheWorker() as Worker
-const imageCache: Record<string, ImageBitmap | true> = {};
+const imageCache: Map<`${string}|${ColorMode | null}`, ImageBitmap | true> = new Map();
 const processedCache: Map<ColorMode | null, Map<string, Map<number, Map<string, ImageBitmap | true>>>> = new Map();
 
 addEventListener(
@@ -26,25 +26,16 @@ export const loadImageAsset = (
   filter: string = '',
   colorMode: ColorMode | null = null
 ): ImageBitmap | null => {
-  const image = imageCache[url];
+  const image = imageCache.get(`${url}|${colorMode}`);
 
   if (image === true) {
     return null;
   } else if (image) {
-    let colorModeMap = processedCache.get(colorMode)
+    let colorModeMap = processedCache.get(colorMode)!
+    let opacityMap = colorModeMap!.get(url)!
 
-    if (!colorModeMap) {
-      colorModeMap = new Map()
-      processedCache.set(colorMode, colorModeMap)
-    }
-
-    let opacityMap = colorModeMap!.get(url);
-
-    if (!opacityMap) {
-      opacityMap = new Map()
-      colorModeMap?.set(url, opacityMap)
-    }
     const clampedOpacity = Math.round(opacity)
+
     let processedMap = opacityMap.get(clampedOpacity)
 
     if (!processedMap) {
@@ -62,24 +53,45 @@ export const loadImageAsset = (
 
     return processedMap.get(filter)! as ImageBitmap
   }
-  fetch(url)
-    .then((res) => res.blob())
-    .then((blob) => createImageBitmap(blob))
+  Promise.resolve(imageCache.get(`${url}|${null}`))
+    .then(image => image ? image : fetch(url)
+      .then((res) => res.blob())
+      .then((blob) => createImageBitmap(blob))
+    ) 
     .then((bitmap) => {
-      imageCache[url] = bitmap
-      const map = new Map([[url, new Map([[100, new Map([['', bitmap]])]])]])
-      processedCache.set(null, map)
-      loadImageAsset(url, opacity, filter, colorMode)
+      imageCache.set(`${url}|${null}`, bitmap)
+      if (colorMode !== null) worker.postMessage(['applyColorMode', bitmap, url, colorMode])
+      processedCache.get(null)!.get(url)!.get(100)!.set('', bitmap)
       return
     })
-  imageCache[url] = true;
+  imageCache.set(`${url}|${null}`, true)
+  imageCache.set(`${url}|${colorMode}`, true);
+
+  const colorModeNullMap = processedCache.get(null)
+  const colorModeMap = processedCache.get(colorMode)
+
+  if (!colorModeNullMap) {
+    processedCache.set(null, new Map([[url, new Map([[100, new Map<string, true | ImageBitmap>([['', true]])]])]]))
+  } else {
+    colorModeNullMap.set(url, new Map([[100, new Map<string, true | ImageBitmap>([['', true]])]]))
+  }
+
+  if (!colorModeMap) {
+    processedCache.set(colorMode, new Map([[url, new Map([[100, new Map<string, true | ImageBitmap>([['', true]])]])]]))
+  } else {
+    colorModeMap.set(url, new Map([[100, new Map<string, true | ImageBitmap>([['', true]])]]))
+  }
   return null;
 };
 
-worker.addEventListener('message', (message: MessageEvent<[action: 'filtersApplied', url: string, colorMode: ColorMode, clampedOpacity: number, filter: string, processedImage: ImageBitmap]>) => {
+worker.addEventListener('message', (message: MessageEvent<[action: 'filtersApplied', url: string, colorMode: ColorMode, clampedOpacity: number, filter: string, processedImage: ImageBitmap] | [action: 'colorModeApplied', url: string, colorMode: ColorMode, image: ImageBitmap]>) => {
   const [action] = message.data
   if (action === 'filtersApplied') {
     const [_, url, colorMode, clampedOpacity, filter, processedImage] = message.data
     processedCache.get(colorMode)!.get(url)!.get(clampedOpacity)!.set(filter, processedImage)
+  } else if (action === 'colorModeApplied') {
+    const [_, url, colorMode, processedImage] = message.data
+    imageCache.set(`${url}|${colorMode}`, processedImage)
+    processedCache.get(colorMode)!.get(url)!.get(100)!.set('', processedImage)
   }
 })

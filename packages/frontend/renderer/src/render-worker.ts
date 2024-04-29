@@ -1,7 +1,6 @@
 import { CircleSprite } from "./canvas_components/circle";
 import { ImageSprite } from "./canvas_components/image";
 import {
-  Change,
   ChangeSet,
   KIND,
   TextDescriptor,
@@ -15,10 +14,16 @@ import { ColorMode } from 'daltonize'
 import { AnimationSprite } from "./canvas_components/animation";
 // @ts-ignore
 import url from '@flaticon/flaticon-uicons/css/uicons-regular-rounded-DWTIAQ4L.woff2?url'
+import protobuf from 'protobufjs'
+// @ts-ignore
+import protoUrl from '@startcoding/types/changeset.proto?url'
+
+const protoPromise = protobuf.load(protoUrl)
+
 
 var uicons = new FontFace('uicons', `url(${url})`);
 
-uicons.load().then(function(font){
+uicons.load().then(function (font) {
   // @ts-expect-error
   fonts.add(font);
 });
@@ -52,7 +57,7 @@ const render = async (changes: ChangeSet, tick: Tick) => {
   if (stageContext.height !== tick.globals.height) {
     stageContext.height = spriteCanvas.height = tick.globals.height;
   }
-  
+
   stageContext.colorMode = tick.colorMode
 
   const layerFrames: Array<[index: number, frame: ImageBitmap]> = []
@@ -60,44 +65,45 @@ const render = async (changes: ChangeSet, tick: Tick) => {
   const domLayerMap: Record<number, Array<TextDescriptor>> = {}
   const domLayers: Array<[index: number, descriptors: Array<TextDescriptor>]> = []
 
-  for (const layer of changes) {
-    const [index, descriptors] = layer;
-    for (const change of descriptors) {
-      if (change.kind === 'backdrop') {
-        BackdropSprite(change.descriptor, stageContext)
-      } else if (!change.descriptor.hidden) {
-        switch (change.kind) {
-          case "image":
-            ImageSprite(change.descriptor, stageContext);
-            break;
-          case "circle":
-            CircleSprite(change.descriptor, stageContext);
-            break;
-          case "line":
-            LineSprite(change.descriptor, stageContext);
-            break;
-          case 'animation':
-            AnimationSprite(change.descriptor, stageContext)
-            break;
-          case "text":
-            TextSprite(change.descriptor, stageContext);
-            if (!domLayerMap.hasOwnProperty(index)) {
-              domLayerMap[index] = []
-              domLayers.push([index, domLayerMap[index]])
-            }
-            domLayerMap[index].push(change.descriptor)
-            break;
+  for (const { index, layer } of changes.layers) {
+    if (layer) {
+      for (const change of layer) {
+        if (change.kind === 'backdrop') {
+          BackdropSprite(change, stageContext)
+        } else if (!change.hidden) {
+          switch (change.kind) {
+            case "image":
+              ImageSprite(change, stageContext);
+              break;
+            case "circle":
+              CircleSprite(change, stageContext);
+              break;
+            case "line":
+              LineSprite(change, stageContext);
+              break;
+            case 'animation':
+              AnimationSprite(change, stageContext)
+              break;
+            case "text":
+              TextSprite(change, stageContext);
+              if (!domLayerMap.hasOwnProperty(index)) {
+                domLayerMap[index] = []
+                domLayers.push([index, domLayerMap[index]])
+              }
+              domLayerMap[index].push(change)
+              break;
+          }
         }
       }
     }
   }
 
-  
+
   let frame: ImageBitmap
 
   try {
     frame = spriteCanvas.transferToImageBitmap()
-  } catch(e: any) {
+  } catch (e: any) {
     postMessage(["renderError", e.toString()])
     return
   }
@@ -113,7 +119,7 @@ const render = async (changes: ChangeSet, tick: Tick) => {
   }
 };
 
-let colorMode: ColorMode | null = null 
+let colorMode: ColorMode | null = null
 let lastChangeSet: ChangeSet | null = null
 let lastTick: Tick | null = null
 
@@ -126,10 +132,16 @@ addEventListener(
 
     if (action === "update") {
       const [_, changes, tick] = message.data;
-      const string = new TextDecoder().decode(changes);
-      lastChangeSet = JSON.parse(string);
-      lastTick = tick
-      render(lastChangeSet!, lastTick!);
+      const root = await protoPromise
+      const layersProto = root.lookupType('types.ChangeSet')
+      const changesArr = new Uint8Array(changes)
+      try {
+        lastChangeSet = layersProto.toObject(layersProto.decode(changesArr)) as ChangeSet
+        lastTick = tick
+        render(lastChangeSet!, lastTick!);
+      } catch (e) {
+        postMessage(['renderError', e]);
+      }
     } else if (action === 'rerender') {
       const [_, colorMode] = message.data
       render(lastChangeSet!, {
