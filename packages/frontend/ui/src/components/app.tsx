@@ -19,6 +19,7 @@ import ModalDialog from "@mui/joy/ModalDialog";
 import Stack from "@mui/joy/Stack";
 import Grid from "@mui/joy/Grid";
 import Button from "@mui/joy/Button";
+import ButtonGroup from "@mui/joy/ButtonGroup";
 import Sheet from "@mui/joy/Sheet";
 import Accordion from "@mui/joy/Accordion";
 import AccordionGroup from "@mui/joy/AccordionGroup";
@@ -204,8 +205,8 @@ export const App = () => {
         <DocsSection section="Motion" color="#4C97FF" blockHeight={56} />
         <DocsSection section="Events" color="#FFBF00" blockHeight={136} />
         <DocsSection section="Looks" color="#9966FF" blockHeight={56}>
-          <label style={{borderBottom: '5px dotted #444', padding: '0 0.75em 0 0.75em' }}>Pick a Color: <input type="color" value={color} onChange={(e) => setColor(e.target.value)} /><pre style={{backgroundColor: '#9966FF22'}}>
-          {`${color}\n//or\nrgb(${hexToRgb(color).join(', ')})`}</pre></label>
+          <label style={{ borderBottom: '5px dotted #444', padding: '0 0.75em 0 0.75em' }}>Pick a Color: <input type="color" value={color} onChange={(e) => setColor(e.target.value)} /><pre style={{ backgroundColor: '#9966FF22' }}>
+            {`${color}\n//or\nrgb(${hexToRgb(color).join(', ')})`}</pre></label>
         </DocsSection>
         <DocsSection section="Control" color="#FFAB19" blockHeight={168} />
       </AccordionGroup>
@@ -457,13 +458,7 @@ export const App = () => {
         </ModalDialog>
       </Modal>
       <Stack
-        sx={{
-          flexGrow: 1,
-          flexShrink: 1,
-          minHeight: 0,
-          minWidth: 0,
-          height: "100vh"
-        }}
+        className="panels"
         direction={"column"}
       >
         <Sheet
@@ -479,9 +474,58 @@ export const App = () => {
                 <Stack
                   direction={"row"}
                   alignItems={"flex-start"}
-                  onClick={() => setSignIn(true)}
+                  spacing={2}
                 >
-                  <Button>{currentUser?.displayName || "Sign In"}</Button>
+                  <Button size="sm">{currentUser?.displayName || "Sign In"}</Button>
+                  <Divider orientation="vertical" />
+                  <ButtonGroup variant="solid" size="sm" color="primary">
+                    <Button
+                      disabled={file === null}
+                      onClick={async () => {
+                        if (currentUser) {
+                          await commit(
+                            fs,
+                            file!,
+                            file! === "index.js" ? code! : readme!,
+                            repoId
+                          );
+                          if (game) await game.reload(code!);
+                        } else {
+                          setSignIn(true);
+                        }
+                      }}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      disabled={code === null}
+                      onClick={async () => {
+                        await game?.reload(code!);
+                        setLoaded(true);
+                        setGame(game);
+                        setGameSpeed(playSpeed);
+                        setError(null);
+                      }}
+                    >
+                      Start
+                    </Button>
+                    <Button
+                      disabled={gameSpeed !== 0 || !loaded || !!error}
+                      onClick={async () => {
+                        setGameSpeed(playSpeed);
+                      }}
+                    >
+                      Play
+                    </Button>
+                    <Button
+                      disabled={gameSpeed === 0 || !loaded || !!error}
+                      onClick={() => {
+                        setGameSpeed(0);
+                      }}
+                    >
+                      Pause
+                    </Button>
+                  </ButtonGroup>
                 </Stack>
               </Grid>
               <Grid xs={2} md={2}>
@@ -500,21 +544,50 @@ export const App = () => {
                   alignItems="center"
                   direction="row"
                 >
-                  <Button
-                    tabIndex={1}
-                    startDecorator={
-                      <i className="fi fi-rr-universal-access"></i>
-                    }
-                    onClick={() => {
-                      setShowEditorDrawer(
-                        editorDrawer !== "accessibility"
-                          ? "accessibility"
-                          : false
-                      );
-                    }}
-                  >
-                    Accessibility
-                  </Button>
+                  <ButtonGroup variant="solid" size="sm" color="primary">
+                    <Button
+                      onClick={() => {
+                        setShowEditorDrawer(
+                          editorDrawer !== "documentation" ? "documentation" : false
+                        );
+                      }}
+                    >
+                      Documentation
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowEditorDrawer(
+                          editorDrawer !== "console" ? "console" : false
+                        );
+                      }}
+                    >
+                      Logs
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowEditorDrawer(
+                          editorDrawer !== "readme" ? "readme" : false
+                        );
+                      }}
+                    >
+                      Readme
+                    </Button>
+                    <Button
+                      tabIndex={1}
+                      startDecorator={
+                        <i className="fi fi-rr-universal-access"></i>
+                      }
+                      onClick={() => {
+                        setShowEditorDrawer(
+                          editorDrawer !== "accessibility"
+                            ? "accessibility"
+                            : false
+                        );
+                      }}
+                    >
+                      Accessibility
+                    </Button>
+                  </ButtonGroup>
                 </Stack>
               </Grid>
             </Grid>
@@ -546,43 +619,6 @@ export const App = () => {
                 ></iframe>
               </section>
             </Sheet>
-            <Stack
-              direction={"row"}
-              spacing={2}
-              style={{
-                backgroundColor: "#6DC0F2",
-                padding: "1em"
-              }}
-            >
-              <Button
-                disabled={code === null}
-                onClick={async () => {
-                  await game?.reload(code!);
-                  setLoaded(true);
-                  setGame(game);
-                  setGameSpeed(playSpeed);
-                  setError(null);
-                }}
-              >
-                Start
-              </Button>
-              <Button
-                disabled={gameSpeed !== 0 || !loaded || !!error}
-                onClick={async () => {
-                  setGameSpeed(playSpeed);
-                }}
-              >
-                Play
-              </Button>
-              <Button
-                disabled={gameSpeed === 0 || !loaded || !!error}
-                onClick={() => {
-                  setGameSpeed(0);
-                }}
-              >
-                Pause
-              </Button>
-            </Stack>
           </Stack>
           <Divider
             orientation="vertical"
@@ -634,7 +670,7 @@ export const App = () => {
                   width: editorWidth,
                   maxWidth: `calc(100vw - ${editorDrawer ? "20em - 500px" : "20em"
                     })`,
-                  minWidth: "20rem",
+                  minWidth: "10rem",
                   minHeight: 0,
                   flexGrow: 1,
                   flexShrink: 1
@@ -686,61 +722,6 @@ export const App = () => {
                   </>
                 ) : null}
               </Stack>
-            </Stack>
-            <Stack
-              direction={"row"}
-              justifyContent={"flex-end"}
-              spacing={2}
-              style={{
-                backgroundColor: "#6DC0F2",
-                padding: "1em"
-              }}
-            >
-              <Button
-                disabled={file === null}
-                onClick={async () => {
-                  if (currentUser) {
-                    await commit(
-                      fs,
-                      file!,
-                      file! === "index.js" ? code! : readme!,
-                      repoId
-                    );
-                    if (game) await game.reload(code!);
-                  } else {
-                    setSignIn(true);
-                  }
-                }}
-              >
-                Save
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowEditorDrawer(
-                    editorDrawer !== "documentation" ? "documentation" : false
-                  );
-                }}
-              >
-                Toggle Documentation
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowEditorDrawer(
-                    editorDrawer !== "console" ? "console" : false
-                  );
-                }}
-              >
-                Toggle Logs
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowEditorDrawer(
-                    editorDrawer !== "readme" ? "readme" : false
-                  );
-                }}
-              >
-                Toggle Readme
-              </Button>
             </Stack>
           </Stack>
         </Stack>

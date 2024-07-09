@@ -1,4 +1,4 @@
-import proto from 'protobufjs'
+const proto = require('protobufjs')
 
 const main = async() => {
   const info = await proto.load('./packages/frontend/types/src/changeset.proto')

@@ -4,10 +4,13 @@ import { initializeApp } from "firebase/app";
 import { Buffer } from "buffer";
 import { createRoot } from 'react-dom/client'
 import { Main } from "./components/main";
-import * as firebaseui from "firebaseui";
-import { getAuth } from "firebase/auth";
 
-// @ts-ignore
+declare global {
+  interface Window {
+    Buffer: typeof Buffer
+  }
+}
+
 window.Buffer = Buffer;
 
 const firebaseConfig = {

@@ -81,9 +81,9 @@ export class MinGCWriter extends Writer {
   }
 
   uint32(value: number) {
+    value = value >>> 0
     this._push(writeVarint32,
-      (value = value >>> 0)
-        < 128 ? 1
+      value < 128 ? 1
         : value < 16384 ? 2
           : value < 2097152 ? 3
             : value < 268435456 ? 4

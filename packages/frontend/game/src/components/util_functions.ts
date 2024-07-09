@@ -4,12 +4,23 @@ import { addAsyncTick, addTick } from '../loop';
 import { Tick } from '@startcoding/types';
 import { validate } from '../utils';
 
+const precision = function precision(a: number) {
+  if (!isFinite(a)) return 0;
+  let e = 1, p = 0;
+  while (Math.round(a * e) / e !== a) { e *= 10; p++; }
+  return p;
+}
+
+export const random = (low: number, high: number, decimals: number = Math.max(precision(low), precision(high))) => {
+  return Math.round(((Math.random() * (high - low)) + low) * 10**decimals) / 10**decimals
+}
+
 export const randomX = () => {
-  return Math.random() * self.width + self.minX;
+  return random(self.minX, self.maxX)
 };
 
 export const randomY = () => {
-  return Math.random() * self.height + self.minY;
+  return random(self.minY, self.maxY)
 };
 
 Hook(
@@ -38,7 +49,7 @@ const wrapConsoleMethod = (method: 'log' | 'error' | 'debug' | 'info') => {
 const nextTick = () => {
   return new Promise<Tick>((resolve, reject) => {
     const remove = addTick((tick) => {
-      remove()
+      remove()  
       resolve(tick)
     }, 2)
   })
@@ -59,8 +70,8 @@ export const repeatUntil = async (condition: (timePassed: number) => boolean) =>
   return !condition(timePassed)
 }
 
-export const range = function*(start: number, end: number) {
-  for (let i = start; i < end; i++) {
+export const range = function*(start: number, end: number, step: number = 10**Math.max(precision(start), precision(end))) {
+  for (let i = start; i < end; i += step) {
     yield i
   }
 }
@@ -103,6 +114,8 @@ declare global {
     always: typeof always
     randomX: typeof randomX
     randomY: typeof randomY
+    random: typeof random
+    range: typeof range
   }
 }
 
@@ -113,5 +126,7 @@ self.run = run
 self.always = always
 self.randomX = randomX
 self.randomY = randomY
+self.random = random
+self.range = range
 
 export { }

@@ -2,7 +2,6 @@
   "name": "@startcoding/game",
   "version": "1.0.0",
   "type": "module",
-  "types": "./dist/game_worker.d.ts",
   "main": "./dist/game_worker.js",
   "license": "MIT",
   "private": true,
@@ -22,7 +21,6 @@
     "protobufjs": "7.2.6"
   },
   "devDependencies": {
-    "typescript": "5.4.3",
-    "esbuild": "0.20.2"
+    "typescript": "5.4.3"
   }
 }

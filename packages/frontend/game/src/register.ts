@@ -29,7 +29,9 @@ export const trigger = (descriptor: EventDescriptor) => {
       const listeners = elementListeners.get(id)?.get(descriptor.kind)
       if (listeners) {
         listeners.forEach((callback) => {
-          callback && callback();
+          if (callback) {
+            callback();
+          }
         });
       }
     });
@@ -78,7 +80,9 @@ addTick((tick) => {
     const listeners = elementListeners.get(id)?.get("mouseout");
     if (listeners) {
       listeners.forEach((callback) => {
-        callback && callback();
+        if (callback) {
+          callback();
+        }
       });
     }
   });
@@ -86,7 +90,9 @@ addTick((tick) => {
     const listeners = elementListeners.get(id)?.get("mouseover");
     if (listeners) {
       listeners.forEach((callback) => {
-        callback && callback();
+        if (callback) {
+          callback()
+        };
       });
     }
   });

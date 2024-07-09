@@ -14,7 +14,13 @@
       {
         "source": "/code/**",
         "function": {
-          "functionId": "code"
+          "functionId": "code:code"
+        }
+      },
+      {
+        "source": "/assets/**",
+        "function": {
+          "functionId": "assets:assets"
         }
       }
     ]
@@ -22,7 +28,12 @@
   "functions": [
     {
       "source": "./functions/code",
-      "codebase": "default",
+      "codebase": "code",
+      "runtime": "nodejs18"
+    },
+    {
+      "source": "./functions/assets",
+      "codebase": "assets",
       "runtime": "nodejs18"
     }
   ],

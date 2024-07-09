@@ -12,7 +12,8 @@
     "./packages/frontend/editor",
     "./packages/frontend/compiler",
     "./packages/frontend/ui",
-    "./functions/code"
+    "./functions/code",
+    "./functions/assets"
   ],
   "private": true
 }

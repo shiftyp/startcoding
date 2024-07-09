@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { editor } from 'monaco-editor'
 import { Editor, EditorProps, Monaco, useMonaco } from "@monaco-editor/react";
 import { Language } from "@startcoding/types";
 
@@ -32,10 +33,13 @@ export const CodeEditor = ({ file, code, readme, error, setCode, setReadme, setE
   }
 
   useEffect(() => {
+    let errorMarkers: editor.IEditorDecorationsCollection | null = null
+    
     if (error && monaco) {
+      const editor = monaco.editor.getEditors()[0]
       const model = monaco.editor.getModels()[0]
       if (model) {
-        monaco.editor.getEditors()[0].createDecorationsCollection([{
+        errorMarkers = editor.createDecorationsCollection([{
           options: {
             linesDecorationsClassName: 'error-line',
             isWholeLine: true,
@@ -45,8 +49,14 @@ export const CodeEditor = ({ file, code, readme, error, setCode, setReadme, setE
           range: new monaco.Range(error.line, error.column, error.line, error.column)
         }])
 
-        
+        const changeHandler = editor.onDidChangeModelContent(() => {
+          setError(null)
+          changeHandler.dispose()
+        })
       }
+    }
+    return () => {
+      errorMarkers?.clear()
     }
   }, [error, monaco])
 

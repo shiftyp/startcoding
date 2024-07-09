@@ -20,16 +20,19 @@ main {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  height: 100dvh;
+  width: 100dvw;
 }
 
 #toolbar {
   padding: 0.25rem;
 }
 
-#panels {
-  height: calc(100% - 2rem);
+.panels {
   display: flex;
   flex-direction: row;
+  height: 100vh;
+  height: 100dvh;
 }
 
 #root {

@@ -6,6 +6,7 @@ import { trigger } from "./register";
 import { callTick, execute } from "./loop";
 import './components'
 
+
 onmessage = async (
   message: MessageEvent<[action: "trigger", descriptor: EventDescriptor] | [action: "callTick", tick: Tick] | [action: 'start', url: string]>
 ) => {
