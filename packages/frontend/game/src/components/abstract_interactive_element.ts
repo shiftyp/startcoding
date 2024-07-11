@@ -275,3 +275,10 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     this.y += yDelta;
   };
 }
+
+// @ts-expect-error
+export class InteractiveElement extends AbstractInteractiveElement {
+
+}
+
+export type InteractiveElementConstructor = typeof InteractiveElement

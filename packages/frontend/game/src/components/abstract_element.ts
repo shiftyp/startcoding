@@ -26,3 +26,10 @@ export abstract class AbstractElement<T = any> {
     return json
   }
 }
+
+// @ts-expect-error
+export class Element extends AbstractElement {
+
+}
+
+export type ElementConstructor = typeof Element
