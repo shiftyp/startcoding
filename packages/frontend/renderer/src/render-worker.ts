@@ -1,6 +1,7 @@
 import { CircleSprite } from "./canvas_components/circle";
 import { ImageSprite } from "./canvas_components/image";
 import {
+  BackdropDescriptor,
   ChangeSet,
   KIND,
   TextDescriptor,
@@ -17,6 +18,7 @@ import url from '@flaticon/flaticon-uicons/css/uicons-regular-rounded-DWTIAQ4L.w
 import protobuf from 'protobufjs'
 // @ts-ignore
 import protoUrl from '@startcoding/types/changeset.proto?url'
+import { loadImageURL } from "./image_cache";
 
 const protoPromise = protobuf.load(protoUrl)
 
@@ -62,14 +64,28 @@ const render = async (changes: ChangeSet, tick: Tick) => {
 
   const layerFrames: Array<[index: number, frame: ImageBitmap]> = []
   const frames: Array<ImageBitmap> = []
-  const domLayerMap: Record<number, Array<TextDescriptor>> = {}
-  const domLayers: Array<[index: number, descriptors: Array<TextDescriptor>]> = []
+  const domLayerMap: Record<number, Array<TextDescriptor | BackdropDescriptor>> = {}
+  const domLayers: Array<[index: number, descriptors: Array<TextDescriptor | BackdropDescriptor>]> = []
 
   for (const { index, layer } of changes.layers) {
     if (layer) {
       for (const change of layer) {
         if (change.kind === 'backdrop') {
-          BackdropSprite(change, stageContext)
+          const url = loadImageURL(change.url, 100, '', stageContext.colorMode)
+
+          if (url) {
+            if (!domLayerMap.hasOwnProperty(0)) {
+              domLayerMap[0] = []
+              domLayers.push([0, domLayerMap[0]])
+            }
+
+            domLayerMap[0].push({
+              url,
+              style: change.style,
+              kind: 'backdrop',
+              repeat: change.repeat,
+            })
+          }
         } else if (!change.hidden) {
           switch (change.kind) {
             case "image":
@@ -112,11 +128,7 @@ const render = async (changes: ChangeSet, tick: Tick) => {
   frames.push(frame)
 
 
-  postMessage(["renderSprites", layerFrames, tick], { transfer: frames });
-
-  if (domLayers.length) {
-    postMessage(['renderDOMSprites', domLayers])
-  }
+  postMessage(["render", layerFrames, tick, domLayers], { transfer: frames });
 };
 
 let colorMode: ColorMode | null = null

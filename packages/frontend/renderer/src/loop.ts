@@ -115,12 +115,12 @@ export const game = async ({
 
   renderWorker.onmessage = async (
     message: MessageEvent<
-      [action: "renderSprites", data: Array<[index: number, frame: ImageBitmap]>, tick: Tick] |
+      [action: "render", data: Array<[index: number, frame: ImageBitmap]>, tick: Tick] |
       [action: "renderError", error: string]
     >
   ) => {
     const [action] = message.data;
-    if (action === "renderSprites") {
+    if (action === "render") {
       const [_, data, tick] = message.data;
 
       tick.timing.deltaRender =

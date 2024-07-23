@@ -51,7 +51,8 @@ export type BaseProperties = {
 export type BackdropDescriptor = {
   kind: "backdrop";
   url: string;
-  style: "cover" | "fill";
+  style: "cover" | "contain";
+  repeat: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
 };
 
 export type PositionProperties = {
