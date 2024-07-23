@@ -131,7 +131,7 @@ export type LineDescriptor = {
 } & BaseProperties & PositionProperties &
   VisibilityProperties;
 
-export type Animations = typeof animations
+export type Animations = typeof animationInfo
 export type AnimationImages = keyof Animations
 export type AnimationCostumes = keyof Animations[AnimationImages]
 export type AnimationsAnimations = keyof Animations[AnimationImages][AnimationCostumes]

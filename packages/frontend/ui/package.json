@@ -36,7 +36,7 @@
     "hex-to-rgb": "1.0.1"
   },
   "devDependencies": {
-    "typescript": "5.4.3",
+    "typescript": "5.5.2",
     "vite": "5.1.6",
     "esbuild": "0.20.2",
     "esbuild-envfile-plugin": "1.0.5",

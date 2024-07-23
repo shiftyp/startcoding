@@ -12,7 +12,7 @@ export const AnimationSprite = <Image extends keyof Animations, Costume extends 
   const { spriteContext, fromStageX, fromStageY, colorMode } = stageContext;
   const { image, animation, costume, frame, x, y, size, angle, opacity, colorEffect } = descriptor;
   const sizeRatio = size / 100
-  // @ts-ignore
+
   const { url, frameHeight, frameWidth, frames } = animationInfo[image][costume][animation]
   const height = frameHeight * sizeRatio
   const width = frameWidth * sizeRatio
@@ -39,6 +39,12 @@ export const AnimationSprite = <Image extends keyof Animations, Costume extends 
     spriteContext.setTransform(transform);
     spriteContext.drawImage(imageBitmap, (clampedFrame % Math.ceil(frames / sheetLength)) * frameWidth, Math.floor(clampedFrame / Math.ceil(frames / sheetLength)) * frameHeight, frameWidth, frameHeight, -width / 2, -height / 2, width, height);
   } else {
+    // Pre-load
+    for (const costume of animationInfo[image]) {
+      for (const animation of animationInfo[image][costume]) {
+        loadImageAsset(animationInfo[image][costume][animation].url, opacity, filter, colorMode)
+      }
+    }
     transform
       .translateSelf(fromStageX(x), fromStageY(y), 0)
       .rotateSelf(-angle - 180);

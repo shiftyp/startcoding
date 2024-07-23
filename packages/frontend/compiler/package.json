@@ -8,7 +8,7 @@
   "devDependencies": {
     "@startcoding/types": "*",
     "@startcoding/game": "*",
-    "typescript": "5.4.3"
+    "typescript": "5.5.2"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -16,7 +16,7 @@
     "./debug-compiler": "./dist/debug_compiler/index.js"
   },
   "dependencies": {
-    "typescript": "5.4.3",
+    "typescript": "5.5.2",
     "ts-creator": "1.2.5"
   },
   "scripts": {

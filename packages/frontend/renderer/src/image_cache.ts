@@ -101,7 +101,7 @@ export const loadImageURL = (...args: [
       return null
     } else {
       const canvas = new OffscreenCanvas(image.width, image.height)
-      canvas.getContext('bitmaprenderer')?.transferFromImageBitmap(image)
+      canvas.getContext('2d')?.drawImage(image, 0, 0)
 
       urlCache.set(image, true)
       !(async () => {
