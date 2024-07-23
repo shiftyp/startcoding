@@ -127,4 +127,4 @@ declare global {
   }
 }
 
-self.Text = TextElement
+self.Text = TextElement 

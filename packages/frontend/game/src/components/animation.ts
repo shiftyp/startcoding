@@ -19,7 +19,6 @@ import FastestValidator, {
   ValidationSchema,
   ValidationRuleObject,
 } from "fastest-validator";
-import { createElementProxy } from "./element_proxy";
 
 const v = new FastestValidator({
   messages: {
@@ -303,5 +302,4 @@ declare global {
   }
 }
 
-// @ts-expect-error
-self.Animation = createElementProxy(AnimationElement);
+self.Animation = AnimationElement

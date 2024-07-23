@@ -1,58 +1,51 @@
-import { ElementDescriptor, ID, KIND } from "@startcoding/types";
+import { GroupDescriptor, ID, KIND } from "@startcoding/types";
 import { addTick } from "../loop";
-import { getId, getRegisteredElements, registerElement, unregisterElement } from "../register";
-import { REMOVE_TICK, SHOULD_RENDER, RENDER, CHILDREN, DESCRIPTOR, NODE, PARENT } from "../symbols";
+import { getId, getRegisteredElements, unregisterElement } from "../register";
+import { REMOVE_TICK, RENDER, CHILDREN, DESCRIPTOR, NODE, PARENT } from "../symbols";
 import { AbstractInteractiveElement } from "./abstract_interactive_element";
 import { AbstractElement } from "./abstract_element";
+import { getRenderingGroup, setRenderingGroup } from "./util_functions";
+import { validate } from "../utils";
 
-let renderingGroup: GroupElement<any>[] = []
-
-export const setRenderingGroup = (group: GroupElement<any>) => {
-  renderingGroup.unshift(group)
-  return () => {
-    renderingGroup.splice(renderingGroup.indexOf(group), 1)
-  }
-}
-
-export const getRenderingGroup = () => {
-  return renderingGroup[0]
-}
-
-export abstract class GroupElement<Properties> extends AbstractElement<Properties> {
-  [DESCRIPTOR]: Properties
+// @ts-expect-error
+export class GroupElement<Properties extends Record<string, any> & GroupDescriptor> extends AbstractElement<Properties & { [KIND]: "group"}> implements AbstractInteractiveElement<"group"> {
+  [KIND] = 'group';
+  // @ts-expect-error
+  [DESCRIPTOR]: Properties = this as unknown as Properties & { [KIND]: "group" }
   [REMOVE_TICK]: () => void;
-  [SHOULD_RENDER] = true;
   [RENDER] = (properties: Properties) => { };
 
-  [ID] = getId();
+  private [CHILDREN]: Map<string, AbstractElement> = new Map();
 
-  [CHILDREN]: number[] = [];
+  angle = 90
+  x = 0
+  y = 0
+  layer = 0
+  hidden = false
+  opacity = 100
+  colorEffect = 0
 
-  constructor(descriptor: Omit<Properties, typeof KIND>, render: (properties: Properties) => void) {
-    super()
-    // @ts-expect-error
-    this[DESCRIPTOR] = {
-      ...descriptor,
-      [KIND]: 'group',
+
+  constructor(descriptor: Omit<Properties, "kind">, render: (properties: Properties) => void) {
+    super(descriptor)
+    for (const key in descriptor) {
+      this[DESCRIPTOR][key as keyof Properties] = descriptor[key as keyof typeof descriptor]
     }
 
     this[RENDER] = render
 
     this[REMOVE_TICK] = addTick(() => {
-      if (this[SHOULD_RENDER]) {
         const unset = setRenderingGroup(this)
-        for (const id of this[CHILDREN]) {
-          getRegisteredElements().get(id)?.delete()
-        }
+        this[CHILDREN].forEach(child => {
+          child.delete()
+        })
         this[RENDER](this[DESCRIPTOR])
-        this[SHOULD_RENDER] = false
         unset()
-      }
     }, 2)
 
     const renderingGroup = getRenderingGroup()
 
-    if (renderingGroup !== null) {
+    if (renderingGroup) {
       renderingGroup[CHILDREN].push(this[ID])
       this[PARENT] = renderingGroup[ID]
     }
@@ -62,9 +55,25 @@ export abstract class GroupElement<Properties> extends AbstractElement<Propertie
     return null;
   }
 
+  removeChild(name: string) {
+    this[CHILDREN].delete(name)
+  }
+
+  addChild(child: AbstractElement) {
+    if (!child.name || this[CHILDREN].has(child.name)) {
+      throw new Error('Child names must be unique')
+    }
+
+    this[CHILDREN].set(child.name, child)
+  }
+
+  getChild(name: string) {
+    return this[CHILDREN].get(name)
+  }
+
   delete(): void {
-    for (const id of this[CHILDREN]) {
-      getRegisteredElements().get(id)?.delete()
+    for (const [name, child] of this[CHILDREN]) {
+     child.delete()
     }
 
     this[REMOVE_TICK]()
@@ -74,24 +83,23 @@ export abstract class GroupElement<Properties> extends AbstractElement<Propertie
   }
   touching(element: AbstractInteractiveElement) {
     if (element[NODE] === null) return false
-    return this[CHILDREN].some((id) => {
-      getRegisteredElements().get(id)?.touching(element)
-    })
+    for (const child of this[CHILDREN].values()) {
+      if (child.touching(element)) {
+        return true
+      }
+    }
+    return false
   };
   touchingElements(): AbstractInteractiveElement[] {
     if (this[NODE] === null) return [];
-    return this[CHILDREN]
-      .map((id) => getRegisteredElements().get(id))
+    return Array.from(this[CHILDREN].values())
       .filter((element) => element && !element.deleted)
       .reduce((acc, element) => [...acc, ...(element instanceof AbstractInteractiveElement ? element.touchingElements() : [])], [] as AbstractInteractiveElement[])
   };
   collideWith(element: AbstractInteractiveElement) { };
   distanceTo(other: AbstractElement) {
     return Math.min(
-      ...this[CHILDREN]
-        .map(
-          id => getRegisteredElements().get(id)
-        )
+      ...Array.from(this[CHILDREN].values())
         .filter(
           element => !!element
         )
@@ -100,12 +108,36 @@ export abstract class GroupElement<Properties> extends AbstractElement<Propertie
       )
     )
   };
+
+  jsonFn: () => string = () => {
+    return `[\n${Array.from(this[CHILDREN].values()).map(child => child.toJSON()).join(',\n')}\n]`
+  };
+
+  @validate({ type: "number" })
+  move(steps: number) {
+    const rads = ((this.angle || 0) / 360) * 2 * Math.PI;
+    const ratio = steps / Math.sin(Math.PI / 2);
+    const xDelta = ratio * Math.sin(Math.PI / 2 - rads);
+    const yDelta = ratio * Math.sin(rads);
+
+    this.x += xDelta;
+    this.y += yDelta;
+  };
+}
+
+export const create = <T extends Record<string, any> & GroupDescriptor>(fn: (group: T) => void, initial: T): GroupElement<T> => {
+  return new (
+    // @ts-expect-error
+    Group as typeof GroupElement
+  )(initial, fn)
 }
 
 declare global {
   interface WorkerGlobalScope {
     Group: typeof GroupElement
+    create: typeof create
   }
 }
 
 self.Group = GroupElement
+self.create = create

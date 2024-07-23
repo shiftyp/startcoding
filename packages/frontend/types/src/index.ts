@@ -44,6 +44,10 @@ export type FillerDescriptor = {
   hidden: true
 }
 
+export type BaseProperties = {
+  name: string
+}
+
 export type BackdropDescriptor = {
   kind: "backdrop";
   url: string;
@@ -67,14 +71,14 @@ export type VisibilityProperties = {
 
 export type GroupDescriptor = Record<PropertyKey, any> & {
   kind: "group";
-};
+} & BaseProperties & PositionProperties
 
 export type ImageDescriptor = {
   kind: "image";
   url: string;
   width: number;
   height: number;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type TextDescriptor = {
@@ -84,7 +88,7 @@ export type TextDescriptor = {
   fontFamily: string;
   textAlign: "start" | "end" | "left" | "center" | "right";
   size: number;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type RectangleDescriptor = {
@@ -92,21 +96,21 @@ export type RectangleDescriptor = {
   width: number;
   height: number;
   color: string;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type PolygonDescriptor = {
   kind: "polygon";
   sides: number;
   color: string;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type CircleDescriptor = {
   kind: "circle";
   radius: number;
   color: string;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type OvalDescriptor = {
@@ -114,7 +118,7 @@ export type OvalDescriptor = {
   width: number;
   height: number;
   color: string;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type LineDescriptor = {
@@ -123,7 +127,7 @@ export type LineDescriptor = {
   y1: number;
   width: number;
   color: string;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type Animations = typeof animations
@@ -139,7 +143,7 @@ export type AnimationDescriptor<Image extends keyof Animations, Costume extends 
   size: number,
   frame: number;
   frameRate: number;
-} & PositionProperties &
+} & BaseProperties & PositionProperties &
   VisibilityProperties;
 
 export type ElementDescriptor =

@@ -1,11 +1,10 @@
-import { ElementDescriptor, ElementDescriptorOfKind, ID, KIND, TreeNode } from "@startcoding/types";
-import { CHILDREN, DESCRIPTOR, MAKE_NODE, NODE, NODE_PRIVATE, PARENT, RESET_NODE } from "../symbols";
-import { addToLayer, getId, getRegisteredElements, isHovering, listenElement, registerElement, removeFromLayer, unregisterElement } from "../register";
+import { ElementDescriptor, ElementDescriptorOfKind, ID, LocalEventProperties, TreeNode } from "@startcoding/types";
+import { CHILDREN, DESCRIPTOR, MAKE_NODE, NODE, NODE_PRIVATE, RESET_NODE } from "../symbols";
+import { addToLayer, getId, getRegisteredElements, isHovering, listenElement, registerElement, removeFromLayer } from "../register";
 import { AbstractElement } from "./abstract_element";
 import { getSpriteTree } from "../collisions";
 import { validate } from "../utils";
 import SAT from 'sat'
-import { getRenderingGroup } from "./group";
 
 
 @validate('string', {
@@ -24,8 +23,10 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
 
   abstract [MAKE_NODE](): void
 
+  private removeEventCallbacks: Array<() => void> = []
+
   constructor(kind: Kind, descriptor: Partial<Omit<ElementDescriptorOfKind<Kind>, "kind">>) {
-    super()
+    super(descriptor)
     // @ts-ignore
     this[DESCRIPTOR] = {
       x: 0,
@@ -38,14 +39,6 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
       colorEffect: 0,
       ...descriptor,
       kind: kind
-    }
-
-    const renderingGroup = getRenderingGroup()
-    
-    if (renderingGroup) {
-      
-      renderingGroup[CHILDREN].push(this[ID])
-      this[PARENT] = renderingGroup[ID]
     }
 
     registerElement(this)
@@ -137,11 +130,6 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     this[DESCRIPTOR].colorEffect = value % 360
   };
 
-  delete() {
-    unregisterElement(this)
-    this.deleted = true;
-  };
-
   hide() {
     this.hidden = true;
   };
@@ -149,6 +137,10 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
   show() {
     this.hidden = false;
   };
+
+  listenElement(descriptor: LocalEventProperties, callback: () => void) {
+    this.removeEventCallbacks.push(listenElement(descriptor, callback))
+  }
 
   @validate({ type: 'function' })
   onMouseDown(callback: () => void) {
@@ -166,7 +158,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
 
   @validate({ type: 'function' })
   onMouseUp(callback: () => void) {
-    listenElement(
+    this.listenElement(
       {
         kind: "mouseup",
         context: "local",
@@ -180,7 +172,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
 
   @validate({ type: 'function' })
   onMouseOver(callback: () => void) {
-    listenElement(
+    this.listenElement(
       {
         kind: "mouseover",
         context: "local",
@@ -194,7 +186,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
 
   @validate({ type: 'function' })
   onMouseOut(callback: () => void) {
-    listenElement(
+    this.listenElement(
       {
         kind: "mouseout",
         context: "local",
@@ -208,7 +200,7 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
 
   @validate({ type: 'function' })
   onMouseMove(callback: () => void) {
-    listenElement(
+    this.listenElement(
       {
         kind: "mousemove",
         context: "local",
@@ -274,6 +266,12 @@ export abstract class AbstractInteractiveElement<Kind extends Exclude<ElementDes
     this.x += xDelta;
     this.y += yDelta;
   };
+
+  delete(): void {
+    super.delete();
+    this.removeEventCallbacks.forEach(callback => callback())
+    this.removeEventCallbacks = []
+  }
 }
 
 // @ts-expect-error

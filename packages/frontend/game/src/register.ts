@@ -175,9 +175,12 @@ export const listenElement = (
   }
   if (!elementListeners.get(descriptor.id)?.has(descriptor.kind as EventDescriptor["kind"])) {
     elementListeners.get(descriptor.id)!.set(descriptor.kind as EventDescriptor["kind"], new Set())
-    elementListeners.get(descriptor.id)!.get(descriptor.kind as EventDescriptor["kind"])!.add(callback);
   }
+  elementListeners.get(descriptor.id)!.get(descriptor.kind as EventDescriptor["kind"])!.add(callback);
 
+  return () => {
+    elementListeners.get(descriptor.id)!.get(descriptor.kind as EventDescriptor["kind"])!.delete(callback)
+  }
 };
 
 export const reset = () => {

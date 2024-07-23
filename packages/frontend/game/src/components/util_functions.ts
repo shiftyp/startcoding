@@ -119,6 +119,19 @@ declare global {
   }
 }
 
+let renderingGroup: any[] = []
+
+export const setRenderingGroup = (group: any) => {
+  renderingGroup.unshift(group)
+  return () => {
+    renderingGroup.splice(renderingGroup.indexOf(group), 1)
+  }
+}
+
+export const getRenderingGroup = () => {
+  return renderingGroup[0]
+}
+
 self.until = until
 self.repeatUntil = repeatUntil
 self.wait = wait
