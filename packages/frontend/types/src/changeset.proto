@@ -36,11 +36,12 @@ message Descriptor {
   // frameRate not transferred
   // BackdropDescriptor
   optional string style = 21;
+  optional string repeat = 22;
   // Shared Properties
-  optional float size = 22;
-  optional string color = 23;
-  optional float width = 24;
-  optional float height = 25;
+  optional float size = 23;
+  optional string color = 24;
+  optional float width = 25;
+  optional float height = 26;
 }
 
 message Layer {
