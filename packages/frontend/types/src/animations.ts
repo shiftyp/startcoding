@@ -1,4 +1,4 @@
-{
+export default {
   "spaceship": {
     "spaceship1": {
       "exhaust": {

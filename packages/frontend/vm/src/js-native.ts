@@ -16,7 +16,7 @@ const gameWorker = new GameWorker() as Worker
 let onError: (info: {
   line: number,
   column: number,
-  message: string[]
+  messages: string[]
 }) => void = () => {}
 
 const connectUpdate = (update: (elements: ArrayBuffer, tick: Tick) => void, onLog: (log: Message) => void) => {
@@ -28,12 +28,12 @@ const connectUpdate = (update: (elements: ArrayBuffer, tick: Tick) => void, onLo
         | [action: 'tickError', info: {
             line: number,
             column: number,
-            message: string[]
+            messages: string[]
           }]
         | [action: 'loadError', info: {
             line: number,
             column: number,
-            message: string[]
+            messages: string[]
           }]
         | [action: 'printToConsole', log: Message ]
       >

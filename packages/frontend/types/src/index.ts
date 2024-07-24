@@ -1,7 +1,7 @@
 // @ts-ignore
 import { ColorMode } from "daltonize";
 export type Language = "javascript" | "python";
-import animations from './animations.json'
+import animations from './animations'
 
 export const animationInfo = animations
 
@@ -130,6 +130,13 @@ export type LineDescriptor = {
   color: string;
 } & BaseProperties & PositionProperties &
   VisibilityProperties;
+
+export type AnimationInfo = {
+  url: string
+  frameHeight: number,
+  frameWidth: number,
+  frames: number
+}
 
 export type Animations = typeof animationInfo
 export type AnimationImages = keyof Animations

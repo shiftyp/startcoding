@@ -1,4 +1,4 @@
-import { AnimationDescriptor, Animations, WorkerStageContext, animationInfo } from "@startcoding/types";
+import { AnimationDescriptor, AnimationInfo, Animations, WorkerStageContext, animationInfo } from "@startcoding/types";
 import { loadImageAsset } from "../image_cache";
 
 const sheetLength = 8
@@ -13,7 +13,7 @@ export const AnimationSprite = <Image extends keyof Animations, Costume extends 
   const { image, animation, costume, frame, x, y, size, angle, opacity, colorEffect } = descriptor;
   const sizeRatio = size / 100
 
-  const { url, frameHeight, frameWidth, frames } = animationInfo[image][costume][animation]
+  const { url, frameHeight, frameWidth, frames } = animationInfo[image][costume][animation] as AnimationInfo
   const height = frameHeight * sizeRatio
   const width = frameWidth * sizeRatio
   
@@ -40,9 +40,9 @@ export const AnimationSprite = <Image extends keyof Animations, Costume extends 
     spriteContext.drawImage(imageBitmap, (clampedFrame % Math.ceil(frames / sheetLength)) * frameWidth, Math.floor(clampedFrame / Math.ceil(frames / sheetLength)) * frameHeight, frameWidth, frameHeight, -width / 2, -height / 2, width, height);
   } else {
     // Pre-load
-    for (const costume of animationInfo[image]) {
-      for (const animation of animationInfo[image][costume]) {
-        loadImageAsset(animationInfo[image][costume][animation].url, opacity, filter, colorMode)
+    for (const costume in animationInfo[image]) {
+      for (const animation in animationInfo[image][costume]) {
+        loadImageAsset((animationInfo[image][costume][animation] as AnimationInfo).url, opacity, filter, colorMode)
       }
     }
     transform

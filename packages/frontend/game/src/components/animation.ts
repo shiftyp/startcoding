@@ -103,6 +103,8 @@ export class AnimationElement<Image extends AnimationImages, Costume extends key
     >
   ) {
     super("animation", {
+      // @ts-expect-error
+      animation: undefined,
       size: 100,
       frame: 0,
       frameRate: 1 / 30,
